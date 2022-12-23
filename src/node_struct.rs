@@ -1,6 +1,7 @@
 use discv5_overlay::portalnet::discovery::Discovery;
 use std::sync::Arc;
 
+// These fields aren't accurate.  Fix them one at a time...
 #[derive(Debug, Clone)]
 pub struct DASNode {
     // discovery: Arc<Discovery>,
