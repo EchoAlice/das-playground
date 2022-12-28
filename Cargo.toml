@@ -9,6 +9,7 @@ edition = "2021"
 discv5 = "0.1"
 discv5-overlay = {git = "https://github.com/timoth-y/discv5-overlay" }
 tokio = { version = "1.23.0", features = ["full"] }
+tracing = { version = "0.1.29" }
 
 [patch.crates-io]
 discv5 = {git = "https://github.com/timoth-y/discv5"}

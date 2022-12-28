@@ -536,6 +536,7 @@ dependencies = [
  "discv5",
  "discv5-overlay",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
