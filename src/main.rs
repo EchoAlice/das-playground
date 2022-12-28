@@ -66,6 +66,8 @@ async fn create_node(i: u16, mut node: DASNode) {
     println!("the node's service channel: {}", discovery.discv5.service_channel);
     
     //Access each node's peers in their routing tables 
+    println!("Our node's neighbors: {:?}", discovery.discv5.kbuckets());
+    println!("\n");
 }
 
 
@@ -80,7 +82,8 @@ async fn create_discv5_server(i: u16) -> Discv5 {
     // Looks like only even numbers.  I bet the "i" gets increased within the function more than once (or is within a loop?) 
     println!("Listen address: {}", listen_addr);
 
-    // Generates new enrs for each id.  Is this ok? 
+    // Generates a node's random enr key and new enr.  
+    // *Base the secp256k1 on our nodes' public keys*
     let enr_key = CombinedKey::generate_secp256k1();
     let enr = {
         let mut builder = enr::EnrBuilder::new("v4");
