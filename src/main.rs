@@ -27,15 +27,12 @@ use node_struct::DASNode;
 // Spins up tasks that create nodes
 #[tokio::main]
 async fn main() {
-    
     let mut handles = Vec::new();
     for i in 0..4 {
-        let mut my_node = DASNode::new();
+        // Should I place nodes inside a vector? 
         let handle = tokio::spawn(async move {
             let i = i as u16; 
-            println!("Create a node");
-            println!("-----------------------------------"); 
-            create_node(i, my_node).await;
+            let my_node = create_node(i).await;
         });
         handles.push(handle);
     } 
@@ -55,19 +52,23 @@ DASNode
     4. Handled_ids
     5. Overlay Protocol 
 */
-async fn create_node(i: u16, mut node: DASNode) {
+async fn create_node(i: u16) -> DASNode {
+    
     // 1. Discovery Protocol
     let discv5 = create_discv5_server(i).await;
-    // println!("create_node DiscV5 Server: {:?}", discv5);
 
     // Base Node Discovery Protocol v5 layer
     let discovery = Arc::new(Discovery::new_raw(discv5, Default::default())); 
-    println!("Discovery: {:?}", discovery);
-    println!("the node's service channel: {}", discovery.discv5.service_channel);
+    println!("{:?}", discovery);
+
+    // Creates node.  I need to add more  
+    let mut my_node = DASNode::new(discovery);
     
-    //Access each node's peers in their routing tables 
-    println!("Our node's neighbors: {:?}", discovery.discv5.kbuckets());
-    println!("\n");
+    // Access each node's peers in their routing tables 
+    // println!("Our node's neighbors: {:?}", discovery.discv5.kbuckets());
+    // println!("\n");
+    
+    my_node 
 }
 
 
@@ -79,6 +80,7 @@ async fn create_discv5_server(i: u16) -> Discv5 {
     let listen_addr = format!("{}:{}", listen_ip, port_start + i)
         .parse::<SocketAddr>()
         .unwrap(); 
+    
     // Looks like only even numbers.  I bet the "i" gets increased within the function more than once (or is within a loop?) 
     println!("Listen address: {}", listen_addr);
 

@@ -4,7 +4,7 @@ use std::sync::Arc;
 // These fields aren't accurate.  Fix them one at a time...
 #[derive(Debug, Clone)]
 pub struct DASNode {
-    // discovery: Arc<Discovery>,
+    discovery: Arc<Discovery>,
     libp2p: String,
     samples: [u8; 8],
     overlay: String,
@@ -17,9 +17,9 @@ pub struct DASNode {
 */
 impl DASNode {
     // pub fn new(discovery: Arc<Discovery>) -> Self {
-    pub fn new() -> Self {
+    pub fn new(discovery: Arc<Discovery>) -> Self {
         Self {
-            // discovery,
+            discovery,
             libp2p: String::from("None"),
             samples: [0; 8],       // Correct number of samples???
             handled_ids: 0,
