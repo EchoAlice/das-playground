@@ -46,7 +46,7 @@ async fn main() {
 // I'm just wanting to create the DASNode.  Worry about instantiating the overlay service later
 /*
 DASNode
-    1. Discovery Protocol
+    1. Discovery Protocol   (Check)  
     2. Libp2p Service
     3. Samples
     4. Handled_ids
@@ -56,8 +56,6 @@ async fn create_node(i: u16) -> DASNode {
     
     // 1. Discovery Protocol
     let discv5 = create_discv5_server(i).await;
-
-    // Base Node Discovery Protocol v5 layer
     let discovery = Arc::new(Discovery::new_raw(discv5, Default::default())); 
     println!("{:?}", discovery);
 
@@ -72,26 +70,19 @@ async fn create_node(i: u16) -> DASNode {
 }
 
 
-// The main Discv5 Service struct. This provides the user-level API for performing queries and
-// interacting with the underlying service.
+// The main Discv5 Service struct. This provides the user-level API for performing queries and interacting with the underlying service.
 async fn create_discv5_server(i: u16) -> Discv5 {
+    
+    // Should UDP ports increment? 
     let port_start = 9000 + i;       
     let listen_ip = String::from("127.0.0.1").parse::<Ipv4Addr>().unwrap(); 
-    let listen_addr = format!("{}:{}", listen_ip, port_start + i)
-        .parse::<SocketAddr>()
-        .unwrap(); 
-    
-    // Looks like only even numbers.  I bet the "i" gets increased within the function more than once (or is within a loop?) 
-    println!("Listen address: {}", listen_addr);
 
-    // Generates a node's random enr key and new enr.  
-    // *Base the secp256k1 on our nodes' public keys*
+    // Generates a node's random enr key and new enr.  *Base the secp256k1 on our nodes' public keys*
     let enr_key = CombinedKey::generate_secp256k1();
     let enr = {
         let mut builder = enr::EnrBuilder::new("v4");
         builder.ip4(listen_ip);
-        builder.udp4(port_start + i);
-        // builder.udp4(port_start);
+        builder.udp4(port_start);
         builder.build(&enr_key).unwrap()
     }; 
    
@@ -103,16 +94,12 @@ async fn create_discv5_server(i: u16) -> Discv5 {
     config_builder.query_timeout(Duration::from_secs(60)); 
     let config = config_builder.build();
     
-    // Is discv5 a server? 
     // Is it the object a node references to manipulate it's own understanding of the network (also how it interacts with the world)
     let mut discv5 = Discv5::new(enr, enr_key, config).unwrap();
-    // let mut discv5 = start_server(&mut discv5); 
     let ip4 = discv5.local_enr().ip4().unwrap();
     let udp4 = discv5.local_enr().udp4().unwrap();
- 
-    //
-    discv5.start(listen_addr)
-    // discv5.start(format!("{}:{}", ip4, udp4).parse().unwrap())
+    
+    discv5.start(format!("{}:{}", ip4, udp4).parse().unwrap())
         .await
         .unwrap();
     
@@ -120,21 +107,6 @@ async fn create_discv5_server(i: u16) -> Discv5 {
 }
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-// async fn start_server(discv5: &mut Discv5) -> Discv5 {
-// }
 
 // fn populate_table(mut discv5_server) -> Discv5 {
 // };
