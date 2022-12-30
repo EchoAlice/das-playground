@@ -20,3 +20,7 @@ I'm redesigning codebase to be more friendly to creating a plethera of module li
 ### Currently:
 1. Restructuring repo.  main.rs will be used to execute different files 
 2. Accessing specific information from a node's discv5 server.  Look into calling a server's api!
+
+
+### To Do:
+Figure out why "use crate::node_struct_test::DASNode;" isn't working in src/nodes/main.rs
