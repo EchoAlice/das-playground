@@ -1,12 +1,11 @@
-use discv5_overlay::portalnet::discovery::Discovery;
+#![allow(unused)]
+use discv5_overlay::{portalnet::discovery::Discovery, utp::stream::UtpListenerRequest};
 use std::sync::Arc;
 
-
-// mod node_struct {
-// These fields aren't accurate.  Fix them one at a time...
+//  Only accurate field is discovery.  Fix the rest one at a time...
 #[derive(Debug, Clone)]
 pub struct DASNode {
-    // Discovery field is ONLY public for testing purposes! 
+    // Discovery field is public for testing purposes! 
     pub discovery: Arc<Discovery>,
     libp2p: String,
     samples: [u8; 8],
@@ -18,8 +17,11 @@ pub struct DASNode {
     Begin to import fields from other crates!
 */
 impl DASNode {
-    // pub fn new(discovery: Arc<Discovery>) -> Self {
-    pub fn new(discovery: Arc<Discovery>) -> Self {
+    pub fn new(
+        discovery: Arc<Discovery>,
+        // utp_listener_tx: mpsc::UnboundedSender<UtpListenerRequest>,
+        // libp2p: Libp2pService,
+    ) -> Self {
         Self {
             discovery,
             libp2p: String::from("None"),
@@ -29,4 +31,3 @@ impl DASNode {
         }
     }
 }
-// }
