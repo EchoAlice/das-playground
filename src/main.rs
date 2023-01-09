@@ -1,13 +1,12 @@
 #![allow(unused)]
-
-mod nodes;
-mod servers;
-
-use crate::nodes::main::run_nodes;
+use crate::das_node::main::run_nodes;
 use crate::servers::main::run_servers;
 
+mod das_node;
+mod servers;
+
+
+// Get rid of servers directory once DAS_node is functional
 fn main() {
-    println!("Test"); 
     run_nodes();
-    run_servers();
 }
