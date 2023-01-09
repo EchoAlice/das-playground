@@ -4,7 +4,10 @@ use crate::das_node::discovery;
 
 
 /*
-    Create nodes that contain servers for each protocol the DASNode supports.  Each server has a task!
+    Create nodes that contain servers for each protocol the DASNode supports.  
+    Our discv5 server runs tasks that are abstracted from us.
+
+    "To process connections concurrently, a new task is spawned for each inbound connection. The connection is processed on this task."
 */
 #[tokio::main]
 async fn main() {
@@ -15,20 +18,22 @@ async fn main() {
         node_futures.push(my_node);
     }
     
-    // Makes sure all nodes have been fully instantiated.  Moves  
+    // Makes sure all nodes have been fully instantiated 
     let mut nodes = Vec::new();
     for node in node_futures {
         let out = node.await; 
         nodes.push(out); 
-        
     }
 
     /*
-        This is where we can start manipulating nodes!
-            1. Figure out how to access a nodes peers within Discv5 
+    Concepts to implement:
+        1. Add nodes to the discv5 network 
+    
     */
     for node in nodes {
         println!("{:?}", node);
+        //  Discv5 Routing tables are empty.  Change this!
+        println!("Our node's discv5 peers: {:?}", node.discovery.discv5.table_entries_enr());
         println!("\n");
     }
 }
@@ -41,7 +46,6 @@ DASNode
     3. Samples
     4. Handled_ids
     5. Overlay Protocol 
-
 */
 async fn create_node(i: u16) -> node_struct::DASNode {
     // 1. Discovery Protocol 
