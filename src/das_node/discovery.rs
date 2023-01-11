@@ -1,13 +1,17 @@
 use discv5::{
     Discv5,
     Discv5ConfigBuilder, 
-    enr, 
+    enr,
+    Enr, 
     enr::CombinedKey,
 };
 use discv5_overlay::portalnet::discovery::Discovery;
+use std::str::FromStr;
 use std::net::Ipv4Addr;
 use std::sync::Arc;
 use std::time::Duration;
+
+use crate::das_node::config::BOOTNODE;
 
 /*
 Notes:
@@ -50,9 +54,10 @@ pub async fn create_discovery(i: u16) -> Arc<Discovery> {
     let ip4 = discv5.local_enr().ip4().unwrap();
     let udp4 = discv5.local_enr().udp4().unwrap();
    
-    // Add bootnode!  Look into DAS Prototype for same functionality... Compare
-    // let ef_bootnode_enr = Enr::from_str(BOOTNODE).unwrap();
-    // discv5.add_enr(ef_bootnode_enr).expect("bootnode error");    
+    // Currently:  Adds bootnode like Brechy  
+    // Later:  Implement routing tables like model-das in set_topology()
+    let ef_bootnode_enr = Enr::from_str(BOOTNODE).unwrap();
+    discv5.add_enr(ef_bootnode_enr).expect("bootnode error");    
 
     // Start the discv5 server
     discv5.start(format!("{}:{}", ip4, udp4).parse().unwrap())
