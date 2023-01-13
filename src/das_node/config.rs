@@ -1,4 +1,6 @@
 #![allow(unused)]
+pub const NUMBER_OF_NODES: usize = 10;
+
 // One of the Ethereum Foundation Geth Bootnodes
 pub const BOOTNODE: &str = "enr:-Ku4QG-2_Md3sZIAUebGYT6g0SMskIml77l6yR-M_JXc-UdNHCmHQeOiMLbylPejyJsdAPsTHJyjJB2sYGDLe0dn8uYBh2F0dG5ldHOIAAAAAAAAAACEZXRoMpC1MD8qAAAAAP__________gmlkgnY0gmlwhBLY-NyJc2VjcDI1NmsxoQORcM6e19T1T9gi7jxEZjk_sjVLGFscUNqAY9obgZaxbIN1ZHCCIyg";
 

@@ -11,11 +11,11 @@ use tokio_stream::wrappers::ReceiverStream;
     Having the dv5_event_stream field doesn't allow for the "clone" trait.  
     Might need move the field if this becomes a problem down the line.
 */
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DASNode {
     // Discovery field is public for testing purposes! dv5_event_stream was manually placed here by me. 
     pub discovery: Arc<Discovery>,
-    pub dv5_event_stream: ReceiverStream<Discv5Event>, 
+    // dv5_event_stream: ReceiverStream<Discv5Event>, 
     
     libp2p: String,
     samples: [u8; 8],
@@ -23,16 +23,22 @@ pub struct DASNode {
     pub handled_ids: i32,
 }
 
+
+/*
+    DASNode should return itself AND an overlay service!
+
+    Do I need to instanitate a libp2p service before creating the overlay?
+*/
 impl DASNode {
     pub fn new(
         discovery: Arc<Discovery>,
-        dv5_event_stream: ReceiverStream<Discv5Event>, 
+        // dv5_event_stream: ReceiverStream<Discv5Event>, 
         // utp_listener_tx: mpsc::UnboundedSender<UtpListenerRequest>,
         // libp2p: Libp2pService,
     ) -> Self {
         Self {
             discovery,
-            dv5_event_stream, 
+            // dv5_event_stream, 
             libp2p: String::from("None"),
             samples: [0; 8],       // Correct number of samples???
             handled_ids: 0,

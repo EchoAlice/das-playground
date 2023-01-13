@@ -17,17 +17,15 @@ use std::time::Duration;
 use crate::das_node::config::BOOTNODE;
 
 /*
-Notes:
-    1.  E & T add discv5 peers within set_topology
-    2.  Understand Rust's mapping syntax (need this for node_ids and enrs)
-
-Questions:
-    1.  Why is the discovery protocol wrapped in Arc?  
-        Maybe:  It allows for persisting data for all sockets
-    2.  How do I add more peers to my table?  Can I ask bootnodes in this simulation???
+    The Node Discovery Protocol v5 (discv5) is the p2p network that Ethereum Nodes use
+    to establish network connections with other nodes.  It acts as a database of all live nodes
+    in the network, performing 3 main functions:
+        1. Sampling the set of all live node
+        2. Searching for nodes providing a certain service (topic advertisement) 
+        3. Authoratative resolution of node records with a node's id
 */
 
-// This function creates the discv5 service + main discovery protocol for EACH NODE! 
+// This function creates the discv5 service + main discovery protocol for a node! 
 pub async fn create_discovery(i: u16) -> Arc<Discovery> {
     // Each task needs to have its own port... OS things  :P
     // Listeing port and address.  Why do we need both? 
@@ -62,7 +60,6 @@ pub async fn create_discovery(i: u16) -> Arc<Discovery> {
     discv5.add_enr(ef_bootnode_enr).expect("bootnode error");    
 
 
-
     /*
     ET allow each DASNode to run a task which contains a loop that (continuously?) processes events from the eventstream 
     Why does their outer for loop use "for __ in discv5_servers"?  Feels like not the best design choice.  Ask later
@@ -88,7 +85,7 @@ pub async fn create_discovery(i: u16) -> Arc<Discovery> {
     - Throughout Tokio, the term "handle" is used to reference a value that *provides access* to some shared state
 */
 
-    // Initialize our protocol
+    // Initializes our protocol.  What's this Portal Config?
     let discovery = Arc::new(Discovery::new_raw(discv5, Default::default())); 
     
     discovery
