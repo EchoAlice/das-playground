@@ -1,1 +1,4 @@
-// Map some things together
+pub fn scratch() {
+    // Place concept here:
+
+}

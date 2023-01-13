@@ -7,7 +7,6 @@ use discv5::{
     Enr, 
     enr::CombinedKey,
 };
-
 use discv5_overlay::portalnet::discovery::Discovery;
 use std::str::FromStr;
 use std::net::Ipv4Addr;
@@ -33,6 +32,7 @@ pub async fn create_discovery(i: u16) -> Arc<Discovery> {
     let listen_ip = String::from("127.0.0.1").parse::<Ipv4Addr>().unwrap(); 
 
     // Generates local node's random enr key and new enr.  *Base the secp256k1 on our node's public key*
+    // There's a lot to talk about wrt ENR things.  Create a summary here soon 
     let enr_key = CombinedKey::generate_secp256k1();
     let enr = {
         let mut builder = enr::EnrBuilder::new("v4");
@@ -41,7 +41,7 @@ pub async fn create_discovery(i: u16) -> Arc<Discovery> {
         builder.build(&enr_key).unwrap()
     }; 
     
-    // Discv5 configureation 
+    // Discv5 configureation.  Not EXACTLY sure why these options were chosen, but I'm following E+T 
     let mut config_builder = Discv5ConfigBuilder::default();
     config_builder.request_retries(10);
     config_builder.filter_max_nodes_per_ip(None);
@@ -54,22 +54,11 @@ pub async fn create_discovery(i: u16) -> Arc<Discovery> {
     let ip4 = discv5.local_enr().ip4().unwrap();
     let udp4 = discv5.local_enr().udp4().unwrap();
    
-    // Currently:  Adds bootnode like Brechy  
-    // Later:  Implement routing tables like model-das in set_topology()
-    let ef_bootnode_enr = Enr::from_str(BOOTNODE).unwrap();
-    discv5.add_enr(ef_bootnode_enr).expect("bootnode error");    
+    // Bootnode functionality.  Might utilize later 
+    // let ef_bootnode_enr = Enr::from_str(BOOTNODE).unwrap();
+    // discv5.add_enr(ef_bootnode_enr).expect("bootnode error");    
 
-
-    /*
-    ET allow each DASNode to run a task which contains a loop that (continuously?) processes events from the eventstream 
-    Why does their outer for loop use "for __ in discv5_servers"?  Feels like not the best design choice.  Ask later
-
-        for (i, discv5) in discv5_servers.into_iter().enumerate() {
-            tokio::spawn {
-                loop{} 
-            }
-        }
-    */
+    // Brechy adds event stream here.  E+T place it in the main app function because....  ___________
 
     // Start the discv5 server
     discv5.start(format!("{}:{}", ip4, udp4).parse().unwrap())
@@ -84,9 +73,8 @@ pub async fn create_discovery(i: u16) -> Arc<Discovery> {
     - What state within our Discovery data structure is needing to be shared?
     - Throughout Tokio, the term "handle" is used to reference a value that *provides access* to some shared state
 */
-
+    
     // Initializes our protocol.  What's this Portal Config?
     let discovery = Arc::new(Discovery::new_raw(discv5, Default::default())); 
-    
     discovery
 }

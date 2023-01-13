@@ -535,6 +535,7 @@ version = "0.1.0"
 dependencies = [
  "discv5",
  "discv5-overlay",
+ "rand 0.8.5",
  "tokio",
  "tokio-stream",
  "tracing",
