@@ -26,8 +26,7 @@ use crate::das_node::config::BOOTNODE;
 
 // This function creates the discv5 service + main discovery protocol for a node! 
 pub async fn create_discovery(i: u16) -> Arc<Discovery> {
-    // Each task needs to have its own port... OS things  :P
-    // Listeing port and address.  Why do we need both? 
+    // A node using the discovery protocol needs to provide an IP address and UDP port to have its record relayed in the DHT
     let port_start = 9000 + i;
     let listen_ip = String::from("127.0.0.1").parse::<Ipv4Addr>().unwrap(); 
 
@@ -41,7 +40,7 @@ pub async fn create_discovery(i: u16) -> Arc<Discovery> {
         builder.build(&enr_key).unwrap()
     }; 
     
-    // Discv5 configureation.  Not EXACTLY sure why these options were chosen, but I'm following E+T 
+    // Discv5 configureation.  Not sure why these specific parameters were chosen, but I'm following E+T 
     let mut config_builder = Discv5ConfigBuilder::default();
     config_builder.request_retries(10);
     config_builder.filter_max_nodes_per_ip(None);
@@ -58,7 +57,7 @@ pub async fn create_discovery(i: u16) -> Arc<Discovery> {
     // let ef_bootnode_enr = Enr::from_str(BOOTNODE).unwrap();
     // discv5.add_enr(ef_bootnode_enr).expect("bootnode error");    
 
-    // Brechy adds event stream here.  E+T place it in the main app function because....  ___________
+    // Brechy adds event stream here.  E+T place it in the main app function because...  
 
     // Start the discv5 server
     discv5.start(format!("{}:{}", ip4, udp4).parse().unwrap())

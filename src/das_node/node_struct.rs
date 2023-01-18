@@ -1,18 +1,25 @@
 #![allow(unused)]
 use discv5::Discv5Event;
+
+// Clean this up
+use discv5_overlay::portalnet::overlay::OverlayProtocol;
+use discv5_overlay::portalnet::types::distance::XorMetric;
 use discv5_overlay::{portalnet::discovery::Discovery, utp::stream::UtpListenerRequest};
+use discv5_overlay::portalnet::storage::MemoryContentStore; 
+
 use std::sync::Arc;
 use tokio_stream::wrappers::ReceiverStream;
 
+use crate::das_node::overlay::{DASContentKey, DASValidator};
+
 // The only accurate field here is discovery!  All other fields have dummy types right now.
-// Could I use box pointers for the event_stream field to allow for cloning of a DASNode?
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct DASNode {
     // Discovery field is public for testing purposes 
     pub discovery: Arc<Discovery>,
+    // pub overlay: Arc<OverlayProtocol<DASContentKey, XorMetric, DASValidator, MemoryContentStore>>,
     libp2p: String,
     samples: [u8; 8],
-    overlay: String,
     pub handled_ids: i32,
 }
 
@@ -21,15 +28,14 @@ pub struct DASNode {
 impl DASNode {
     pub fn new(
         discovery: Arc<Discovery>,
-        // utp_listener_tx: mpsc::UnboundedSender<UtpListenerRequest>,
-        // libp2p: Libp2pService,
+        // overlay: Arc<OverlayProtocol<DASContentKey, XorMetric, DASValidator, MemoryContentStore>>,
     ) -> Self {
         Self {
             discovery,
+            // overlay,
             libp2p: String::from("None"),
             samples: [0; 8],       // Correct number of samples???
             handled_ids: 0,
-            overlay: String::from("None"),
         }
     }
 }

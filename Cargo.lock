@@ -533,8 +533,12 @@ dependencies = [
 name = "das_playground"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "async-trait",
  "discv5",
  "discv5-overlay",
+ "eth2_ssz",
+ "eth2_ssz_derive",
  "rand 0.8.5",
  "tokio",
  "tokio-stream",

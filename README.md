@@ -1,7 +1,5 @@
 The idea behind this repository is to play with + showcase concepts that are used within [DAS Prototype](https://github.com/ChainSafe/das-prototype).  Along with DAS-Prototype, I'm also utilizing Brechy's [CL-P2P-Setup](https://github.com/brech1/cl-p2p-setup) as a resource to implement these Consensus Layer P2P concepts that may (down the line) be used for Data Availability Sampling.
 
-The repo is now friendly to creating a plethera of module like projects that can be run independently within DAS Playground!
-
 
 ### Goals:
 1.  Spin up DASNodes that instantiate: 
@@ -15,10 +13,9 @@ The repo is now friendly to creating a plethera of module like projects that can
 
 
 ### Currently:
-1.  Setting discv5's network topology (placing peers in discv5's routing table)
+1.  Instantiating the overlay protocol 
 
 ### To Do:
-1. Create event loop for each discv5 server
+1. Create event stream for each discv5 server
 2. Instantiate overlay protocol
-3. Learn how to manipulate shared state of complex data structures via 
-3. Instantiate libp2p service 
+3. Send messages via overlay protocol

@@ -6,8 +6,12 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+anyhow = "1.0.66"
+async-trait = "0.1.58"
 discv5 = "0.1"
 discv5-overlay = {git = "https://github.com/timoth-y/discv5-overlay" }
+eth2_ssz = "0.4.0"
+eth2_ssz_derive = "0.3.0"
 rand = "0.8.5"
 tokio = { version = "1.23.0", features = ["full"] }
 tokio-stream = "0.1.10"
