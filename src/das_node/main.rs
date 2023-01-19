@@ -1,4 +1,5 @@
 #![allow(unused)]
+use discv5_overlay::utp::stream::{UtpListener, UtpListenerRequest};
 use rand::Rng;
 use tokio_stream::wrappers::ReceiverStream;
 
@@ -12,20 +13,18 @@ use crate::das_node::{
 
 
 
-// ************What're the differences between the discv5 hanlder and overlay handler?***************
-
 /*
     Goals: 
         - Create DASNodes that contain servers for each protocol the DASNode supports.  
         - Pass information back and for between these created nodes via the overlay and/or discv5's TalkReq/TalkResp
                "The request is TALKREQ [ req-id, protocol, data ]" <-- https://github.com/ethereum/devp2p/issues/156
 
-
     Notes:
         - "To process connections concurrently, a new task is spawned for each inbound connection. The connection is processed on this task."
         - Event streams are stored within the main function, not within a data structure
         - E&T as to why they're passing around messages with uTP https://hackmd.io/@timofey/SyqzhA4vo#712-Reliable-UDP-over-Discv5
-        
+        - Obtain the discv5 event stream so we can spawn a manager task for our _____________       
+
     Questions:
         1.  Why is the discovery protocol wrapped in Arc?  
             Maybe:  It allows for persisting data for all sockets
@@ -34,11 +33,9 @@ use crate::das_node::{
 */
 #[tokio::main]
 async fn main() {
-    let mut nodes = Vec::new();
-    let mut node_futures = Vec::new(); 
-    let mut event_streams = Vec::new(); 
-
     // Create our DASNodes 
+    let mut node_futures = Vec::new(); 
+    let mut nodes = Vec::new();
     for i in 0..NUMBER_OF_NODES {
         let i = i as u16; 
         let my_node = create_node(i);
@@ -48,26 +45,44 @@ async fn main() {
         let out = node.await; 
         nodes.push(out); 
     }
-
-    /* 
-    Summary of loop: 
-        1. Places event streams in vector (instead of within the DASNode struct, so we can clone DASNode) 
-        2. Add peers from simulation to each others' routing tables
-    */
+   
+    // Create event streams and add nodes to routing tables
+    let mut event_streams = Vec::new(); 
     for i in 0..NUMBER_OF_NODES {
-        // println!("Our node's enr: {:?}", nodes[i].discovery);
-        
+        // Listen for events! 
         let mut event_str = ReceiverStream::new(nodes[i].discovery.discv5.event_stream().await.unwrap());
         event_streams.push(event_str); 
        
         // Populate our nodes' routing tables
-        set_topology(i, nodes.clone());
-    }
-    // Obtain event loops for discv5 and overlay network! 
+        populate_routing_table(i, nodes.clone());
+       
+        // Create uTP channel for overlay messaging 
+        let ( // Channel to process uTP TalkReq packets from main protal event handler
+              utp_events_tx, 
+              // Channel to process portal overlay requests
+              utp_listener_tx, mut utp_listener_rx, 
+              // Main uTP service used to listen and handle all uTP connections and streams
+              mut utp_listener, 
+        ) = UtpListener::new(nodes[i].discovery.clone());
+        tokio::spawn(async move { utp_listener.start().await });
+        
+        /*
+        Spawn manager task to handle overlay messages from our utp channel.  For context -->  https://tokio.rs/tokio/tutorial/channels
+            - Task manages our client resource and is a channel that acts as a buffer 
+            - Requires listening to your event stream!
+            - Where should I place the proxy used to delegate different overlays' request 
+                handling logic?  (Trin)
+        */
 
-    // Send a message from one node to another via TalkReq/TalkResp.  Directly via Discv5 protocol for practice 
-    //    Do I need event loops to send request?
-    // nodes[0].discovery.send_talk_req(enr, protocol, request);
+
+    }
+
+    // Example node
+    println!("Our node's discovery protocol: {:?}", nodes[3].discovery);
+    println!("Event stream: {:?}", event_streams[3]);
+    println!("\n");
+
+
 
 }
 
@@ -85,7 +100,7 @@ async fn create_node(i: u16) -> DASNode {
     let discovery = discovery::create_discovery(i).await;
     
     // 2. Overlay Protocol.  
-    let overlay = overlay::create_overlay(discovery.clone()).await;  
+    // let overlay = overlay::create_overlay(discovery.clone()).await;  
 
     // 3. Libp2p Service
 
@@ -94,17 +109,15 @@ async fn create_node(i: u16) -> DASNode {
     // 5. Handled Ids
 
 
-
     // Creates node.  Add fields as project progresses  
     // let mut my_node = DASNode::new(discovery, overlay);
     let mut my_node = DASNode::new(discovery);
     my_node 
 }
 
-/*
-    Adds nodes from within the simulation to routing tables.  
- */
-fn set_topology(local_index: usize, mut nodes: Vec<DASNode>) {
+
+// Adds nodes from within the simulation to routing tables.  
+fn populate_routing_table(local_index: usize, mut nodes: Vec<DASNode>) {
     // Number of peers a node adds to their routing table 
     let mut n = 3;
     let mut used_indexes = Vec::new();
