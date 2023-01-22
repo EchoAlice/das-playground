@@ -100,7 +100,6 @@ impl Validator<DASContentKey> for DASValidator {
         - Why do our protocols need an atomically reference-counted pointer?
         - What are our message tasks?  What is our client task? 
 
-   
 
     The Overlay protocol is a layer on top of discv5 that handles all requests from the overlay networks
     (state, history etc.) and dispatch them to the discv5 protocol TalkReq. Each network should
@@ -110,11 +109,11 @@ impl Validator<DASContentKey> for DASValidator {
 
 // Creates the entire overlay protocol within this function.  Reference Model DAS's impl DASNode{}    
 // Make more generalizable content keys so i can reuse this function for second overlay...  -->  <TContentKey, TStore, etc.>.  Look at overlay protocol 
-pub async fn create_overlay(discovery: Arc<Discovery>, utp_listener_tx: mpsc::UnboundedSender<UtpListenerRequest>) -> Option<Arc<OverlayProtocol<DASContentKey, XorMetric, DASValidator, MemoryContentStore>>> 
-    // ( 
-    // Option<OverlayProtocol<DASContentKey, XorMetric, DASValidator, MemoryContentStore>>, 
-    // OverlayService<DASContentKey, XorMetric, DASValidator, MemoryContentStore> 
-    // ) 
+pub async fn create_overlay(discovery: Arc<Discovery>, utp_listener_tx: mpsc::UnboundedSender<UtpListenerRequest>) ->  
+    ( 
+    Option<Arc<OverlayProtocol<DASContentKey, XorMetric, DASValidator, MemoryContentStore>>>, 
+    OverlayService<DASContentKey, XorMetric, DASValidator, MemoryContentStore> 
+    ) 
     { 
     let config = OverlayConfig {
         bootnode_enrs: discovery.clone().discv5.table_entries_enr(),
@@ -142,13 +141,6 @@ pub async fn create_overlay(discovery: Arc<Discovery>, utp_listener_tx: mpsc::Un
         protocol,
         validator,
     );
-
     let overlay = Arc::new(overlay);
-    Some(overlay)
-    // Some(overlay)
-    // // Do I need to have a "None" option here?
-    // (
-    //     Some(overlay),
-    //     service
-    // )
+    ( Some(overlay), service )
 }

@@ -11,7 +11,6 @@ use tokio_stream::wrappers::ReceiverStream;
 
 use crate::das_node::overlay::{DASContentKey, DASValidator};
 
-
 // Figure out how to create a DAS Node that is initialized without an overlay field, but can be added down the line
 
 // The only accurate field here is discovery!  All other fields have dummy types right now.
@@ -29,7 +28,6 @@ pub struct DASNode {
 impl DASNode {
     pub fn new(
         discovery: Arc<Discovery>,
-        // overlay: Arc<OverlayProtocol<DASContentKey, XorMetric, DASValidator, MemoryContentStore>>,
     ) -> Self {
         Self {
             discovery,
@@ -38,8 +36,4 @@ impl DASNode {
             handled_ids: 0,
         }
     }
-
-    // pub fn add_overlay() {
-    //        ???
-    // }
 }

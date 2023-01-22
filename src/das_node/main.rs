@@ -12,7 +12,6 @@ use crate::das_node::{
 };
 
 
-
 /*
     Goals: 
         - Create DASNodes that contain servers for each protocol the DASNode supports.  
@@ -26,9 +25,10 @@ use crate::das_node::{
         - Obtain the discv5 event stream so we can spawn a manager task for our _____________       
 
     Questions:
-        1.  Why is the discovery protocol wrapped in Arc?  
+        1.  Is there just one data structure for each protocol?  And each protocol is accessed through individual services that have been instantiated for each node?
+        2.  Why is the discovery protocol wrapped in Arc?  
             Maybe:  It allows for persisting data for all sockets
-        2.  How do i send a message from Discv5's TalkReq/Resp?  
+        3.  How do i send a message from Discv5's TalkReq/Resp?  
             Does it have to be through the overlay?  Or is it accessible at the disv5 protocol
 */
 #[tokio::main]
@@ -57,17 +57,13 @@ async fn main() {
                 utp_listener_tx, mut utp_listener_rx, 
                 mut utp_listener, 
         ) = UtpListener::new(nodes[i].discovery.clone());
-    
-        // println!("utp_events_tx {:?}", utp_events_tx);    
-        // println!("utp_listener_tx {:?}", utp_listener_tx);    
-        // println!("utp_listener_rx {:?}", utp_listener_rx);    
-        // println!("\n");
 
         // Starts the main uTP service used to listen and handle all uTP connections and streams
         tokio::spawn(async move { utp_listener.start().await });
         
         // 2. Instantiate our Overlay Protocol.        Return our overlay and overlay service! (overlay goes inside dasnode) 
-        nodes[i].overlay = overlay::create_overlay(nodes[i].discovery.clone(), utp_listener_tx).await;  
+        let (overlay, overlay_service) = overlay::create_overlay(nodes[i].discovery.clone(), utp_listener_tx).await;  
+        nodes[i].overlay = overlay;
 
         /*
         Spawn manager task to handle overlay messages from our utp channel.  For context -->  https://tokio.rs/tokio/tutorial/channels
