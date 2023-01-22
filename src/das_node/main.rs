@@ -16,7 +16,7 @@ use crate::das_node::{
 /*
     Goals: 
         - Create DASNodes that contain servers for each protocol the DASNode supports.  
-        - Pass information back and for between these created nodes via the overlay and/or discv5's TalkReq/TalkResp
+        - Pass information back and forth between these created nodes via overlay 
                "The request is TALKREQ [ req-id, protocol, data ]" <-- https://github.com/ethereum/devp2p/issues/156
 
     Notes:
@@ -33,39 +33,42 @@ use crate::das_node::{
 */
 #[tokio::main]
 async fn main() {
-    // Create our DASNodes 
     let mut node_futures = Vec::new(); 
     let mut nodes = Vec::new();
+    
+    // Create our DASNodes 
     for i in 0..NUMBER_OF_NODES {
-        let i = i as u16; 
-        let my_node = create_node(i);
+        let my_node = create_node(i as u16);
         node_futures.push(my_node);
     }
     for node in node_futures {
         let out = node.await; 
         nodes.push(out); 
     }
-   
-    // Create event streams and add nodes to routing tables
+  
+    // Obtain event streams, start up uTP channel, initialize overlay
     let mut event_streams = Vec::new(); 
     for i in 0..NUMBER_OF_NODES {
-        // Listen for events! 
         let mut event_str = ReceiverStream::new(nodes[i].discovery.discv5.event_stream().await.unwrap());
         event_streams.push(event_str); 
-       
-        // Populate our nodes' routing tables
-        populate_routing_table(i, nodes.clone());
-       
+
         // Create uTP channel for overlay messaging 
-        let ( // Channel to process uTP TalkReq packets from main protal event handler
-              utp_events_tx, 
-              // Channel to process portal overlay requests
-              utp_listener_tx, mut utp_listener_rx, 
-              // Main uTP service used to listen and handle all uTP connections and streams
-              mut utp_listener, 
+        let (   utp_events_tx, 
+                utp_listener_tx, mut utp_listener_rx, 
+                mut utp_listener, 
         ) = UtpListener::new(nodes[i].discovery.clone());
+    
+        // println!("utp_events_tx {:?}", utp_events_tx);    
+        // println!("utp_listener_tx {:?}", utp_listener_tx);    
+        // println!("utp_listener_rx {:?}", utp_listener_rx);    
+        // println!("\n");
+
+        // Starts the main uTP service used to listen and handle all uTP connections and streams
         tokio::spawn(async move { utp_listener.start().await });
         
+        // 2. Instantiate our Overlay Protocol.        Return our overlay and overlay service! (overlay goes inside dasnode) 
+        nodes[i].overlay = overlay::create_overlay(nodes[i].discovery.clone(), utp_listener_tx).await;  
+
         /*
         Spawn manager task to handle overlay messages from our utp channel.  For context -->  https://tokio.rs/tokio/tutorial/channels
             - Task manages our client resource and is a channel that acts as a buffer 
@@ -73,17 +76,22 @@ async fn main() {
             - Where should I place the proxy used to delegate different overlays' request 
                 handling logic?  (Trin)
         */
+        
+        // Task manager 
+        tokio::spawn(async move {
+            // We need our overlay service!
+        });
+    }
 
-
+    // Populate our nodes' routing tables
+    for i in 0..NUMBER_OF_NODES {
+        populate_routing_table(i, nodes.clone());
     }
 
     // Example node
     println!("Our node's discovery protocol: {:?}", nodes[3].discovery);
     println!("Event stream: {:?}", event_streams[3]);
     println!("\n");
-
-
-
 }
 
 
@@ -99,17 +107,18 @@ async fn create_node(i: u16) -> DASNode {
     // 1. Discovery Protocol 
     let discovery = discovery::create_discovery(i).await;
     
-    // 2. Overlay Protocol.  
-    // let overlay = overlay::create_overlay(discovery.clone()).await;  
+/// Represent overlay to uTP listener request. It is used as a way to communicate between the overlay protocol
+/// and uTP listener.         I believe this is the connection between our overlay and discv5 protocols!
 
-    // 3. Libp2p Service
+    // 2. Secure Overlay Protocol
+    //      TODO
+    // 3. Samples
+    //      TODO
+    // 4. Handled_ids 
+    //      TODO
 
-    // 4. Samples
-
-    // 5. Handled Ids
-
-
-    // Creates node.  Add fields as project progresses  
+    
+    // Creates node  
     // let mut my_node = DASNode::new(discovery, overlay);
     let mut my_node = DASNode::new(discovery);
     my_node 

@@ -40,7 +40,7 @@ pub async fn create_discovery(i: u16) -> Arc<Discovery> {
         builder.build(&enr_key).unwrap()
     }; 
     
-    // Discv5 configureation.  Not sure why these specific parameters were chosen, but I'm following E+T 
+    // Discv5 configuration.  Not sure why these specific parameters were chosen, but I'm following E+T 
     let mut config_builder = Discv5ConfigBuilder::default();
     config_builder.request_retries(10);
     config_builder.filter_max_nodes_per_ip(None);
