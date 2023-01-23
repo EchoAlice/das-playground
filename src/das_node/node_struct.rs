@@ -1,11 +1,13 @@
-#![allow(unused)]
 use discv5::Discv5Event;
-// Clean this up
-use discv5_overlay::portalnet::overlay::OverlayProtocol;
-use discv5_overlay::portalnet::types::distance::XorMetric;
-use discv5_overlay::{portalnet::discovery::Discovery, utp::stream::UtpListenerRequest};
-use discv5_overlay::portalnet::storage::MemoryContentStore; 
-
+use discv5_overlay::{
+    portalnet::{
+        discovery::Discovery, 
+        overlay::OverlayProtocol, 
+        storage::MemoryContentStore, 
+        types::distance::XorMetric
+    }, 
+    utp::stream::UtpListenerRequest
+};
 use std::sync::Arc;
 use tokio_stream::wrappers::ReceiverStream;
 
@@ -22,7 +24,6 @@ pub struct DASNode {
     samples: [u8; 8],
     pub handled_ids: i32,
 }
-
 
 // The DASNode within Model-DAS returns itself AND an overlay service!
 impl DASNode {

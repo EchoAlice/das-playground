@@ -1,18 +1,25 @@
-#![allow(unused)]
 use async_trait::async_trait;
-use discv5_overlay::portalnet::discovery::Discovery;
-use discv5_overlay::portalnet::overlay::{OverlayConfig, OverlayProtocol};
-use discv5_overlay::portalnet::overlay_service::OverlayService;
-use discv5_overlay::portalnet::storage::{DistanceFunction, MemoryContentStore};
-use discv5_overlay::portalnet::types::content_key::OverlayContentKey;
-use discv5_overlay::portalnet::types::distance::{Distance, XorMetric};
-use discv5_overlay::portalnet::types::messages::ProtocolId;
-use discv5_overlay::types::validation::Validator;
-use discv5_overlay::utp::stream::UtpListenerRequest;
-use std::fmt;
-use std::fmt::{Display, Formatter};
-use std::sync::Arc;
-use std::time::Duration;
+use discv5_overlay::{
+    portalnet::{
+        discovery::Discovery,
+        overlay::{OverlayConfig, OverlayProtocol},
+        overlay_service::OverlayService,
+        storage::{DistanceFunction, MemoryContentStore},
+        types::{
+            content_key::OverlayContentKey,
+            distance::{Distance, XorMetric},
+            messages::ProtocolId
+        }
+    },
+    types::validation::Validator,
+    utp::stream::UtpListenerRequest,
+};
+use std::{
+    fmt,
+    fmt::{Display, Formatter},
+    sync::Arc,
+    time::Duration
+};
 use ssz::{Decode, Encode};
 use ssz_derive::{Decode, Encode};
 use tokio::sync::mpsc;
@@ -141,6 +148,7 @@ pub async fn create_overlay(discovery: Arc<Discovery>, utp_listener_tx: mpsc::Un
         protocol,
         validator,
     );
+    
     let overlay = Arc::new(overlay);
     ( Some(overlay), service )
 }

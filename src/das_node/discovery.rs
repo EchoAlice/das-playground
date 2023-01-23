@@ -1,4 +1,3 @@
-#![allow(unused)]
 use discv5::{
     Discv5,
     Discv5ConfigBuilder,
@@ -8,10 +7,12 @@ use discv5::{
     enr::CombinedKey,
 };
 use discv5_overlay::portalnet::discovery::Discovery;
-use std::str::FromStr;
-use std::net::Ipv4Addr;
-use std::sync::Arc;
-use std::time::Duration;
+use std::{
+    net::Ipv4Addr,
+    str::FromStr,
+    sync::Arc,
+    time::Duration,
+};
 
 use crate::das_node::config::BOOTNODE;
 
