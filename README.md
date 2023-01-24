@@ -12,8 +12,11 @@ The idea behind this repository is to build out the DAS p2p networking stack nee
 1.  Spin up DASNodes that instantiate: 
     - Discovery Protocol        [X]
     - Overlay Protocol          [X]
-    - Secure Overlay Protocol   [ ] 
+        1. Main DAS Network     [ ]
+        2. Secure DAS Network   [ ]
 2.  Add information to their routing tables and data stores.
+
+*The Main DAS Network and Secure DAS Network are considered subprotocols* 
 
 ### To Do:
 1. Send messages via overlay protocol
