@@ -1,8 +1,12 @@
 use async_trait::async_trait;
+use discv5::TalkRequest;
 use discv5_overlay::{
     portalnet::{
         discovery::Discovery,
-        overlay::{OverlayConfig, OverlayProtocol},
+        overlay::{
+            OverlayConfig, 
+            OverlayProtocol
+        },
         overlay_service::OverlayService,
         storage::{DistanceFunction, MemoryContentStore},
         types::{
@@ -12,7 +16,11 @@ use discv5_overlay::{
         }
     },
     types::validation::Validator,
-    utp::stream::UtpListenerRequest,
+    utp::stream::{
+        UtpListener,
+        UtpListenerEvent, 
+        UtpListenerRequest
+    },
 };
 use std::{
     fmt,
@@ -22,14 +30,15 @@ use std::{
 };
 use ssz::{Decode, Encode};
 use ssz_derive::{Decode, Encode};
-use tokio::sync::mpsc;
+use tokio::sync::{
+    mpsc,
+    mpsc::{UnboundedReceiver, UnboundedSender}
+};
 
 const DAS_PROTOCOL_ID: &str = "DAS";
 
-/*
-    I don't know what's going on with these DASContentKey + DASValidator traits.
-    Copy + pasted from Model-DAS's overlay.rs!
-*/
+// Copy + pasted DASContentKey + DASValidator traits from Model-DAS's overlay.rs
+
 /// A content key in the DAS overlay network.
 #[derive(Clone, Debug, Decode, Encode, PartialEq)]
 #[ssz(enum_behaviour = "union")]
@@ -94,6 +103,7 @@ impl Validator<DASContentKey> for DASValidator {
     }
 }
 
+
 /*
     Goal: 
         Understand how these utp channels work to facilitate overlay communication
@@ -101,12 +111,9 @@ impl Validator<DASContentKey> for DASValidator {
     Notes:
         - E&T use the uTP protocol for reliable message passing over UDP.
               Check out the reasons why reliable messaging is needed in DAS --> https://hackmd.io/@timofey/SyqzhA4vo#712-Reliable-UDP-over-Discv5
-        - I don't understand what's going on above these comments... 
     Questions:
         - Should our create_overlay() also spawn our client task manager? 
-        - Why do our protocols need an atomically reference-counted pointer?
         - What are our message tasks?  What is our client task? 
-
 
     The Overlay protocol is a layer on top of discv5 that handles all requests from the overlay networks
     (state, history etc.) and dispatch them to the discv5 protocol TalkReq. Each network should
@@ -114,14 +121,12 @@ impl Validator<DASContentKey> for DASValidator {
     handling common network requests/responses.
 */
 
-// Creates the entire overlay protocol within this function.  Reference Model DAS's impl DASNode{}    
-// Make more generalizable content keys so i can reuse this function for second overlay...  -->  <TContentKey, TStore, etc.>.  Look at overlay protocol 
-pub async fn create_overlay(discovery: Arc<Discovery>, utp_listener_tx: mpsc::UnboundedSender<UtpListenerRequest>) ->  
-    ( 
-    Option<Arc<OverlayProtocol<DASContentKey, XorMetric, DASValidator, MemoryContentStore>>>, 
-    OverlayService<DASContentKey, XorMetric, DASValidator, MemoryContentStore> 
-    ) 
-    { 
+// Make more generalizable content keys so i can reuse this function for secondary overlay...  -->  <TContentKey, TStore, etc.>  
+// Look at overlay protocol! 
+pub async fn create_overlay(discovery: Arc<Discovery>, utp_listener_tx: mpsc::UnboundedSender<UtpListenerRequest>) -> ( 
+    Arc<OverlayProtocol<DASContentKey, XorMetric, DASValidator, MemoryContentStore>>, 
+    OverlayService<DASContentKey, XorMetric, DASValidator, MemoryContentStore>
+    ) { 
     let config = OverlayConfig {
         bootnode_enrs: discovery.clone().discv5.table_entries_enr(),
         ping_queue_interval: Some(Duration::from_secs(10000)),
@@ -150,5 +155,8 @@ pub async fn create_overlay(discovery: Arc<Discovery>, utp_listener_tx: mpsc::Un
     );
     
     let overlay = Arc::new(overlay);
-    ( Some(overlay), service )
+    ( 
+        overlay, 
+        service 
+    )
 }

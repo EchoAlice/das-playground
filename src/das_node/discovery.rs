@@ -14,7 +14,6 @@ use std::{
     time::Duration,
 };
 
-use crate::das_node::config::BOOTNODE;
 
 /*
     The Node Discovery Protocol v5 (discv5) is the p2p network that Ethereum Nodes use
@@ -53,26 +52,11 @@ pub async fn create_discovery(i: u16) -> Arc<Discovery> {
     let mut discv5 = Discv5::new(enr, enr_key, config).unwrap();
     let ip4 = discv5.local_enr().ip4().unwrap();
     let udp4 = discv5.local_enr().udp4().unwrap();
-   
-    // Bootnode functionality.  Might utilize later 
-    // let ef_bootnode_enr = Enr::from_str(BOOTNODE).unwrap();
-    // discv5.add_enr(ef_bootnode_enr).expect("bootnode error");    
-
-    // Brechy adds event stream here.  E+T place it in the main app function because...  
 
     // Start the discv5 server
     discv5.start(format!("{}:{}", ip4, udp4).parse().unwrap())
         .await
         .unwrap();
-
-/*
-    Shared State:
-    - Arc allows state to be referenced concurrently by many tasks and/or threads (aka sharing state) 
-    - When you're shared state is complex (like the discovery struct), you'll want a task to manage the state and
-      utilize message passing to operate on it
-    - What state within our Discovery data structure is needing to be shared?
-    - Throughout Tokio, the term "handle" is used to reference a value that *provides access* to some shared state
-*/
     
     // Initializes our protocol.  What's this Portal Config?
     let discovery = Arc::new(Discovery::new_raw(discv5, Default::default())); 
