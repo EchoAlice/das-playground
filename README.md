@@ -22,3 +22,7 @@ The idea behind this repository is to build out the DAS p2p networking stack nee
 1. Send messages via overlay protocol
 2. Instantiate message processing within each node
 3. Modify create_overlay() to be generalizable for creating a Secure Overlay
+
+### Note:
+I'm trying to design this repository to be easy to comprehend (at the cost of efficiency), making these networking concepts more accessible.
+With that being said... I'm new to Rust.  So if you've got suggestions for cleaner code, make a PR or reach out!  
