@@ -38,6 +38,9 @@ DASNode --> order of operations
         - Secure DAS Overlay Network      [ ]    (Subprotocol) 
     4. Samples                            [ ]
     5. Handled_ids ???                    [ ]
+
+    ***To facilitate communication we must create message processing to allow for manipulation of each node's state.
+
 */
 /*
     Goals: 
@@ -71,83 +74,28 @@ DASNode --> order of operations
             (Reword this question when you understand things better)
         3.  When is it super important for us to start running asyncronous code within the *main* function?  Aka asyncronysity BETWEEN nodes
 */
-// Using multiple for loops to break up the major steps
+
+
+
 #[tokio::main]
 async fn main() {
-    
     let mut nodes = Vec::new();
-    let mut overlay_services = Vec::new(); 
-    let mut utp_events_txs = Vec::new(); 
-    let mut utp_listener_rxs = Vec::new(); 
     
-    // Creates our DASNodes which implement the discv5 and overlay protocols
-    // Grabs utp communication channels instantiated from within create_node().  We need these for overlay communication!
+    // Part 1:
+    // Instantiates protocol structs and message processing within each node
     for i in 0..NUMBER_OF_NODES {
-        // Is it possible to/should I not call await? And gather info (joinhandles await) in a seperate for loop? 
-        // I believe that this is no longer creating nodes concurrently.  Is this true? Is this a bad thing? 
         let (node, 
-            overlay_service, 
+            mut overlay_service, 
             utp_events_tx, 
             utp_listener_rx
         ) = create_node(i as u16).await;
-        
-        /*
-            Maybe move other code from main for loops in here...?
-            
-            But I'm unsure of how our asyncronous code plays into everything... 
-            For now, allow all nodes to be created within one loop, then initialize our message processing in another loop
-        */
        
+        let mut event_str = ReceiverStream::new(node.discovery.discv5.event_stream().await.unwrap());
 
-        // Gathers information for each node in the network.  If we move code inside same function, we can get rid of these vectors! 
-        nodes.push(node);
-        overlay_services.push(overlay_service);
-        utp_events_txs.push(utp_events_tx);
-        utp_listener_rxs.push(utp_listener_rx)
-    }
-
-
-    // Obtains event streams.  Populates our nodes' routing tables   
-    let mut event_streams = Vec::new();
-    for i in 0..NUMBER_OF_NODES {
-        let mut event_str = ReceiverStream::new(nodes[i].discovery.discv5.event_stream().await.unwrap());
-        event_streams.push(event_str); 
-        
-        populate_routing_table(i, nodes.clone());
-        
-        // Can we check when nodes are added to the routing table via event streams?  Could be good practice
-    }
-
-    /*
-        So far, our program runs syncronously... All good (maybe?), 
-        but once we've gotten our nodes set up, we want for communication between nodes to happen concurrently (simulates communication within a network).  
-
-        To set up communication between nodes, we need to:
-            1.  Spawn a task to process messages, sent internally from protocol struct to service, to manipulate state of our protocols (data stores?). 
-                Do we only need one message processing task per node?  
-                
-                For context on manipulating shared state through message passing -->  https://tokio.rs/tokio/tutorial/channels
-            
-            2.  Make some sort of proxy to handle the different subnetworks messaging (What Trin does!)  
-                See here: https://github.com/ethereum/trin/blob/master/trin-core/src/portalnet/discovery.rs#L174
-
-        Once message processing tasks are set up within nodes, we can connect nodes to one another.
-    */
-    
-    //  Instantiates task manager to process ALL messages for each node.  
-    //  For now, we're ony dealing with overlay requests
-    for i in 0..NUMBER_OF_NODES {
-        // Is the correct service always matching to the correct node?  
-        let mut overlay_service = overlay_services.remove(0);
-          
+        //  Instantiates task manager to process ALL messages for each node.  
+        //  Continuously processes inbound commands.  For now, we're ony dealing with overlay requests!
         tokio::spawn(async move {
-        
-        /*
-            Continually processes inbound overlay commands
-            Our overlay_service.command_rx is doing the same thing as Tokio's TCP listener in tutuorial --> https://tokio.rs/tokio/tutorial/spawning
-            
-            Sockets are accepted in a loop.  Each socket is processed then closed.  (Socket might not be the right word)
-        */
+            // Implement the other message types that are used in DAS Prototype. 
             loop {
                 select! {
                     Some(command) = overlay_service.command_rx.recv() => {
@@ -160,11 +108,27 @@ async fn main() {
                 }
             } 
         });
+        nodes.push(node);
     }
     
+    // Populates our nodes' routing tables.   
+    for i in 0..NUMBER_OF_NODES {
+        populate_routing_table(i, nodes.clone());
+    }
+
     // Shows that the Discv5 and Overlay protocols within a node are instantiated!
     println!("Our node's enr according to discovery protocol: {:?}", nodes[2].discovery.local_enr());
     println!("Our node's enr according to overlay protocol: {:?}", nodes[2].overlay.local_enr());
+
+
+
+    // Part 2:
+    // Create simple communication between nodes.  
+    
+    // First send a message from one node to another via overlay request.  What's the best way to do this?
+
+
+
 }
 
 
