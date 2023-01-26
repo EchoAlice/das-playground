@@ -93,7 +93,6 @@ async fn main() {
         
         /*
             Maybe move other code from main for loops in here...?
-            This will allow us to utilize our overlay service the same way Timofey does in DAS-Prototype
             
             But I'm unsure of how our asyncronous code plays into everything... 
             For now, allow all nodes to be created within one loop, then initialize our message processing in another loop
@@ -119,28 +118,30 @@ async fn main() {
         // Can we check when nodes are added to the routing table via event streams?  Could be good practice
     }
 
-
     /*
         So far, our program runs syncronously... All good (maybe?), 
         but once we've gotten our nodes set up, we want for communication between nodes to happen concurrently (simulates communication within a network).  
 
         To set up communication between nodes, we need to:
-            1.  Allow for each node to communicate internally:    Protocol data store <-> Service 
-            
-            2.  Spawn a task to process messages (sent internally from protocol struct to service) to handle state of our protocols (data stores?). 
+            1.  Spawn a task to process messages, sent internally from protocol struct to service, to manipulate state of our protocols (data stores?). 
                 Do we only need one message processing task per node?  
+                
                 For context on manipulating shared state through message passing -->  https://tokio.rs/tokio/tutorial/channels
             
-            3.  Make some sort of proxy to handle the different subnetworks messaging (What Trin does!  See here: https://github.com/ethereum/trin/blob/master/trin-core/src/portalnet/discovery.rs#L174)
+            2.  Make some sort of proxy to handle the different subnetworks messaging (What Trin does!)  
+                See here: https://github.com/ethereum/trin/blob/master/trin-core/src/portalnet/discovery.rs#L174
 
         Once message processing tasks are set up within nodes, we can connect nodes to one another.
     */
-
-    // Instantiates task manager to process ALL messages for each node.  For now, we're ony dealing with overlay requests
+    
+    //  Instantiates task manager to process ALL messages for each node.  
+    //  For now, we're ony dealing with overlay requests
     for i in 0..NUMBER_OF_NODES {
-
+        // Is the correct service always matching to the correct node?  
+        let mut overlay_service = overlay_services.remove(0);
+          
         tokio::spawn(async move {
-            let mut overlay_service = overlay_services[i];
+        
         /*
             Continually processes inbound overlay commands
             Our overlay_service.command_rx is doing the same thing as Tokio's TCP listener in tutuorial --> https://tokio.rs/tokio/tutorial/spawning
@@ -160,7 +161,7 @@ async fn main() {
             } 
         });
     }
-
+    
     // Shows that the Discv5 and Overlay protocols within a node are instantiated!
     println!("Our node's enr according to discovery protocol: {:?}", nodes[2].discovery.local_enr());
     println!("Our node's enr according to overlay protocol: {:?}", nodes[2].overlay.local_enr());
