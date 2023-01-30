@@ -1,5 +1,8 @@
 #![allow(unused)]
-use discv5::TalkRequest;
+use discv5::{
+    Discv5Event, 
+    TalkRequest
+};
 use discv5_overlay::{
     portalnet::{
         overlay_service::{
@@ -7,7 +10,10 @@ use discv5_overlay::{
             OverlayService
         },
         storage::MemoryContentStore,
-        types::distance::XorMetric, 
+        types::{
+            distance::XorMetric,
+            messages::ProtocolId
+        }, 
     },
     utp::stream::{UtpListener, UtpListenerRequest, UtpListenerEvent}
 };
@@ -18,6 +24,7 @@ use tokio::{
 };
 use tokio_stream::wrappers::ReceiverStream;
 use tracing::debug;
+use tracing::log::error;
 
 use crate::das_node::{
     discovery,
@@ -30,6 +37,7 @@ use crate::das_node::{
 };
 
 pub const NUMBER_OF_NODES: usize = 10;
+const DAS_PROTOCOL_ID: &str = "DAS";
 /*
 DASNode --> order of operations
     1. Discovery Protocol                 [X]  
@@ -80,8 +88,10 @@ DASNode --> order of operations
 #[tokio::main]
 async fn main() {
     let mut nodes = Vec::new();
+    //============================ 
+    //   Part 1:  Node Creation
+    //============================ 
     
-    // Part 1:
     // Instantiates protocol structs and message processing within each node
     for i in 0..NUMBER_OF_NODES {
         let (node, 
@@ -89,19 +99,69 @@ async fn main() {
             utp_events_tx, 
             utp_listener_rx
         ) = create_node(i as u16).await;
-       
-        let mut event_str = ReceiverStream::new(node.discovery.discv5.event_stream().await.unwrap());
+      
+        // Problem lies here!
+        let mut event_str = ReceiverStream::new(nodes[i].discovery.discv5.event_stream().await.unwrap());
 
-        //  Instantiates task manager to process ALL messages for each node.  
-        //  Continuously processes inbound commands.  For now, we're ony dealing with overlay requests!
+        /*
+            Instantiates task manager to process ALL messages for each node.   
+            Later, create a task manager for the two protocols discv5 and overlay.  
+            See Trin: https://github.com/ethereum/trin/blob/master/trin-core/src/portalnet/discovery.rs#L174
+        */
         tokio::spawn(async move {
-            // Implement the other message types that are used in DAS Prototype. 
+            //  This is the server part of our node! Continuously processes inbound commands.  
             loop {
                 select! {
+                    // Discv5: 
+                    //      Implement discv5 message processing used in DAS Prototype.
+    // **Fit Discv5 Event processing from Model DAS to DAS Playground**
+                    Some(e) = event_str.next() => {
+                        let chan = format!("{i} {}", nodes[i].discovery.discv5.local_enr().node_id().to_string());
+                        match e {
+                            Discv5Event::TalkRequest(req) => {
+                                debug!("Stream {}: Talk request received", chan);
+                                // msg_counter.send(MsgCountCmd::Increment);
+                                // clone_all!(das_node, opts, enr_to_libp2p, node_ids, utp_events_tx);
+                                tokio::spawn(async move {
+                                    let protocol = ProtocolId::from_str(&hex::encode_upper(req.protocol())).unwrap();
+
+                                    if protocol == ProtocolId::Utp {
+                                        utp_events_tx.send(req).unwrap();
+                                        return;
+                                    }
+
+                                    if protocol == ProtocolId::Custom(DAS_PROTOCOL_ID.to_string()) {
+                                        let talk_resp = match nodes[i].overlay.process_one_request(&req).await {
+                                            Ok(response) => discv5_overlay::portalnet::types::messages::Message::from(response).into(),
+                                            Err(err) => {
+                                                error!("Node {chan} Error processing request: {err}");
+                                                return;
+                                            },
+                                        };
+
+                                        if let Err(err) = req.respond(talk_resp) {
+                                            error!("Unable to respond to talk request: {}", err);
+                                            return;
+                                        }
+
+                                        return;
+                                    }
+
+                                    // let resp = handle_talk_request(req.node_id().clone(), req.protocol(), req.body().to_vec(), nodes[i], opts, enr_to_libp2p, node_ids, i).await;
+                                    let resp = handle_talk_request(req.node_id().clone(), req.protocol(), req.body().to_vec(), nodes[i]).await;
+                                    req.respond(resp);
+                                });
+                            },
+                            _ => {}    
+                        }
+                    },
+                    // Overlay:  
+                    //      Add other overlay message types (Line 324 of Model DAS) 
                     Some(command) = overlay_service.command_rx.recv() => {
                         match command {
-                            OverlayCommand::Request(request) => overlay_service.process_request(request),
-                            // **See line 324 of Model DAS to implement other OverlayCommand!**  
+                            // Print something here bc idk if this is reacting
+                            // OverlayCommand::Request(request) => {overlay_service.process_request(request); println!("Processing request")}, 
+                            OverlayCommand::Request(request) => overlay_service.process_request(request), 
                             _ => {}    
                         }
                     }
@@ -116,19 +176,24 @@ async fn main() {
         populate_routing_table(i, nodes.clone());
     }
 
-    // Shows that the Discv5 and Overlay protocols within a node are instantiated!
-    println!("Our node's enr according to discovery protocol: {:?}", nodes[2].discovery.local_enr());
-    println!("Our node's enr according to overlay protocol: {:?}", nodes[2].overlay.local_enr());
 
+    //================================ 
+    //   Part 2: Node Communication
+    //================================ 
 
+    // Create simple communication between nodes!  Sends a ping from node 1 to node 2
+    // How can I see when a node processes the incoming ping? 
+    let result = nodes[1].overlay.send_ping(nodes[2].overlay.local_enr());
 
-    // Part 2:
-    // Create simple communication between nodes.  
-    
     // First send a message from one node to another via overlay request.  What's the best way to do this?
 
 
-
+    // Shows that the Discv5 and Overlay protocols within a node are instantiated!
+    println!("Our node's enr according to discovery protocol: {:?}", nodes[2].discovery.local_enr());
+    println!("\n"); 
+    println!("Our node's enr according to overlay protocol: {:?}", nodes[2].overlay.local_enr());
+    println!("\n"); 
+    println!("Subprotocol: {:?}", nodes[2].overlay.protocol());
 }
 
 
