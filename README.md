@@ -15,10 +15,11 @@ The idea behind this repository is to build out the DAS p2p networking stack nee
         1. Main DAS Network (*Subprotocol*)    [ ]     
         2. Secure DAS Network (*Subprotocol*)  [ ]     
 2.  Manipulate node's state through our main and secure DAS networks  
-3.  Add peers to their routing tables and samples to data stores.
+3.  Add peers to their routing tables and samples to data stores through overlay requests.
 
 ### To Do:
-1. Instantiate message processing within each node
+1. Instantiate message processing within each node.  
+   *Currently figuring out logging for when messages are being processed*
 2. Send message via overlay protocol
 3. Modify create_overlay() to be generalizable for creating a Secure Overlay
 
