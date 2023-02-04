@@ -27,6 +27,7 @@ use std::{
 // This function creates the discv5 service + main discovery protocol for a node! 
 pub async fn create_discovery(i: u16) -> Arc<Discovery> {
     // A node using the discovery protocol needs to provide an IP address and UDP port to have its record relayed in the DHT
+    // Do we need to have incremental IP addresses?
     let port_start = 9000 + i;
     let listen_ip = String::from("127.0.0.1").parse::<Ipv4Addr>().unwrap(); 
 
@@ -53,12 +54,29 @@ pub async fn create_discovery(i: u16) -> Arc<Discovery> {
     let ip4 = discv5.local_enr().ip4().unwrap();
     let udp4 = discv5.local_enr().udp4().unwrap();
 
-    // Start the discv5 server
+    // Initializes the discv5 service.  Starts the required tasks and begins listening on a given UDP SocketAddr
     discv5.start(format!("{}:{}", ip4, udp4).parse().unwrap())
         .await
         .unwrap();
     
-    // Initializes our protocol.  What's this Portal Config?
-    let discovery = Arc::new(Discovery::new_raw(discv5, Default::default())); 
+    /*
+        Initialize discovery.start() instead of discv5.start().  It calls discv5.start() AND sets up the proxy to sit between different overlay protocols and our Discv5. 
+        We need to create the logic that passes TalkReqs to the correct subnetwork.  See our events.rs 
+    */
+    // Each node is using  IpV4 Socket: Some(75.130.204.11:4242) + listen_socket: 0.0.0.0:4242.  Do we need to change this?  
+    let discovery = Discovery::new(Default::default()); 
+    let discovery = Arc::new(discovery.unwrap());
+    println!("Discovery we want: {:?}", discovery);
+   
+    // This will allow us to listen to all overlay requests!
+    // let talk_req_rx = discovery.start().await.unwrap(); 
+    
+    /*
+    
+    */
+    // Initializes our protocol (How Timofey and Eric do things).  Portal Config? 
+    // let discovery = Arc::new(Discovery::new_raw(discv5, Default::default())); 
+    // println!("Discovery in use: {:?}", discovery);
+
     discovery
 }
