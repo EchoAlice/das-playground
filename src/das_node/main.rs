@@ -20,13 +20,14 @@ use discv5_overlay::{
 use futures::stream::{FuturesOrdered, FuturesUnordered};
 use futures::{AsyncWriteExt, FutureExt, StreamExt};  //pin_mut
 use rand::Rng;
+use std::env;
 use std::str::FromStr;
 use tokio::{
     select, 
     sync::mpsc::{UnboundedReceiver, UnboundedSender}
 };
 use tokio_stream::wrappers::ReceiverStream;
-use tracing::debug;
+use tracing::{debug, info};
 use tracing::log::error;
 
 use crate::das_node::{
@@ -44,49 +45,16 @@ const DAS_PROTOCOL_ID: &str = "DAS";
 
 
 /*
-DASNode --> order of operations
-    1. Discovery Protocol                 [X]  
-    2. Overlay Protocol                   [X]
-        - DAS Overlay Network             [ ]    (Subprotocol) 
-        - Secure DAS Overlay Network      [ ]    (Subprotocol) 
-    4. Samples                            [ ]
-    5. Handled_ids ???                    [ ]
-
-    ***To facilitate communication we must create message processing to allow for manipulation of each node's state.
-*/
-/*
     Goals: 
-        - Create DASNodes that contain servers for each protocol the DASNode supports.  
+        - Create DASNodes that contain the protocols and subprotocols listed above.  
         - Pass information back and forth between these created nodes via overlay 
                "The request is TALKREQ [ req-id, protocol, data ]" <-- https://github.com/ethereum/devp2p/issues/156
         - Design the code to be easily understandable (educational resource) 
 
-    Answered Questions:
-        - Each node has a protocol struct that stores its own information related to that protocol.  
-          Each node has a service that interacts with that node's protocol struct.
-        - The protocol structs within DASNode are wrapped in Arc<> purely for prototyping purposes!
-          Allows the structs to be updated in both event loop routine and in simulation starting function
-
-    Notes:
-        - "To process connections concurrently, a new task is spawned for each inbound connection. The connection is processed on this task."
-        - Event streams are stored within the main function, not within a data structure
-        - E&T as to why they're passing around messages with uTP https://hackmd.io/@timofey/SyqzhA4vo#712-Reliable-UDP-over-Discv5
-        - Obtain the discv5 event stream so we can spawn a manager task for our _____________       
-        - After instantiating the overlay service,  I'll need to pass messages to nodes to test the thing!
-
-        Shared State:
-            - Arc allows state to be referenced concurrently by many tasks and/or threads (aka sharing state) 
-            - When you're shared state is complex (like the discovery struct), you'll want a task to manage the state and utilize message passing to operate on it
-            - Throughout Tokio, the term "handle" is used to reference a value that *provides access* to some shared state
-    
     Questions:
-        1.  How do i send a message from Discv5's TalkReq/Resp?  
-            Does it have to be through the overlay?  Or is it accessible at the disv5 protocol
-        2.  Are the different tasks that request to change the node's protocol struct the reason why node's protocol struct needs to have Arc<> fields?
-            (Reword this question when you understand things better)
-        3.  When is it super important for us to start running asyncronous code within the *main* function?  Aka asyncronysity BETWEEN nodes
-*/
+        What all do I need to do to make custom overlay networks?
 
+*/
 
 
 #[tokio::main]
@@ -104,18 +72,22 @@ async fn main() {
             utp_listener_rx
         ) = create_node(i as u16).await;
       
-        let mut event_str = ReceiverStream::new(starter_node.discovery.discv5.event_stream().await.unwrap());
+        // IDK if we can obtain the event stream using discovery.start() instead of discv5.start() 
+        // let mut event_str = ReceiverStream::new(starter_node.discovery.discv5.event_stream().await.unwrap());
 
-        // This doesn't feel clean... But might be the best we can do      :P 
+        // It doesn't feel clean copying the entire node to pass info into our task manager  :P 
         let node = starter_node.clone(); 
         nodes.push(starter_node);
 
+        // Should I be manually handling messages?  Look at Trin for inspiration 
+    /*
         /*
-            This is the server side of our node! Instantiates task manager to continually process ALL messages for each node.
+            This is the server side of our nodes. Instantiates task manager to continually process ALL messages for each node.
             Later, create task manager(s?) to handle the two protocols discv5 and overlay.  See Trin: https://github.com/ethereum/trin/blob/master/trin-core/src/portalnet/discovery.rs#L174
         */
         tokio::spawn(async move {
             loop {
+                println!("Spawn our task!");  
                 select! {
                     // Discv5: 
                     //      Implement discv5 message processing used in DAS Prototype.
@@ -123,20 +95,15 @@ async fn main() {
                         let chan = format!("{i} {}", node.discovery.discv5.local_enr().node_id().to_string());
                         match event {
                             Discv5Event::TalkRequest(req) => {
-                                debug!("Stream {}: Talk request received", chan);
-                                // msg_counter.send(MsgCountCmd::Increment);
-                                // clone_all!(node, opts, enr_to_libp2p, node_ids, utp_events_tx);
+                                println!("Our node's enr inside of task: {:?}", node.discovery.local_enr());
+                                println!("Stream {}: Discv5 TalkReq received", chan);  
+                                
                                 let node = node.clone(); 
-                                let utp_events_tx = utp_events_tx.clone();
                                 tokio::spawn(async move {
                                     let protocol = ProtocolId::from_str(&hex::encode_upper(req.protocol())).unwrap();
 
-                                    if protocol == ProtocolId::Utp {
-                                        utp_events_tx.send(req).unwrap();
-                                        return;
-                                    }
-
                                     if protocol == ProtocolId::Custom(DAS_PROTOCOL_ID.to_string()) {
+                                        println!("Enters DAS Protocol");  
                                         let talk_resp = match node.overlay.process_one_request(&req).await {
                                             Ok(response) => discv5_overlay::portalnet::types::messages::Message::from(response).into(),
                                             Err(err) => {
@@ -146,6 +113,7 @@ async fn main() {
                                         };
 
                                         if let Err(err) = req.respond(talk_resp) {
+                                            println!("Error");  
                                             error!("Unable to respond to talk request: {}", err);
                                             return;
                                         }
@@ -172,9 +140,8 @@ async fn main() {
                 }
             } 
         });
-        // nodes.push(node);
+    */   
     }
-    
     // Populates our nodes' routing tables.   
     for i in 0..NUMBER_OF_NODES {
         populate_routing_table(i, nodes.clone());
@@ -185,18 +152,28 @@ async fn main() {
     //   Part 2: Node Communication
     //================================ 
 
-    // Create simple communication between nodes!  How can I see when a node processes the incoming ping? 
+    // Creates simple communication between nodes 
     let result = nodes[1].overlay.send_ping(nodes[2].overlay.local_enr());
-
-
-
-    // Shows that the Discv5 and Overlay protocols within a node are instantiated!
-    println!("Our node's enr according to discovery protocol: {:?}", nodes[2].discovery.local_enr());
-    println!("\n"); 
-    println!("Our node's enr according to overlay protocol: {:?}", nodes[2].overlay.local_enr());
-    println!("\n"); 
-    println!("Subprotocol: {:?}", nodes[2].overlay.protocol());
+    result.await;
+    
+    
+    // ***We can no longer run any code after awaiting our tasks.  The tasks are designed to never stop running! 
+    //================================ 
+    //         Sanity Check 
+    //================================ 
+    let discovery_enr = nodes[2].discovery.local_enr();
+    let overlay_enr = nodes[2].overlay.local_enr(); 
+    if discovery_enr == overlay_enr {
+        println!("Discovery and overlay protocol *structs* are instantiated")
+    } else {
+        println!("Discovery and overlay protocol *structs* are not instantiated")
+    };
+    println!("Discovery Enr: {}", nodes[2].discovery.local_enr());
 }
+
+
+
+
 
 
 async fn create_node(i: u16) -> (
@@ -207,7 +184,8 @@ async fn create_node(i: u16) -> (
     ) {
     // 1. Discovery Protocol 
     let discovery = discovery::create_discovery(i).await;
-   
+  
+    // Get rid of UTP logic!!!
     // Create uTP channel for overlay messaging.  What's the deal with this vs the overlay? 
     let ( utp_events_tx, 
             utp_listener_tx, mut utp_listener_rx, 

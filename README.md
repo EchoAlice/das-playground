@@ -19,9 +19,14 @@ The idea behind this repository is to build out the DAS p2p networking stack nee
 
 ### To Do:
 1. Instantiate message processing within each node.  
-   *Currently figuring out logging for when messages are being processed*
-2. Send message via overlay protocol
-3. Modify create_overlay() to be generalizable for creating a Secure Overlay
+2. Create content key for secure overlay.  
+   I need to implement a second overlay protocol struct that takes in this content key!
+3. Send message via overlay protocols
+
+### Currently:
+I'm figuring out how to handle messages from multiple overlay networks.  Not sure whether I can process different overlays' messages within this single message processing task... Or if I have to set up a proxy, similar to [Trin](https://github.com/ethereum/trin/blob/master/trin-core/src/portalnet/discovery.rs#L173) to handle these seperate networks.
+
+Just realized I've got to create a new overlay protocol struct within DASNode for **each** overlay network I'm wanting to create!
 
 ### Note:
 I'm trying to design this repository to be easy to comprehend (at the cost of efficiency), making these networking concepts more accessible.
