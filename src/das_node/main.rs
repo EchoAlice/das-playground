@@ -72,22 +72,25 @@ async fn main() {
             utp_listener_rx
         ) = create_node(i as u16).await;
       
-        // IDK if we can obtain the event stream using discovery.start() instead of discv5.start() 
-        // let mut event_str = ReceiverStream::new(starter_node.discovery.discv5.event_stream().await.unwrap());
+        // Idk if we can obtain the event stream using discovery.start() instead of discv5.start() 
+        let mut event_str = ReceiverStream::new(starter_node.discovery.discv5.event_stream().await.unwrap());
 
         // It doesn't feel clean copying the entire node to pass info into our task manager  :P 
         let node = starter_node.clone(); 
         nodes.push(starter_node);
 
-        // Should I be manually handling messages?  Look at Trin for inspiration 
-    /*
-        /*
-            This is the server side of our nodes. Instantiates task manager to continually process ALL messages for each node.
-            Later, create task manager(s?) to handle the two protocols discv5 and overlay.  See Trin: https://github.com/ethereum/trin/blob/master/trin-core/src/portalnet/discovery.rs#L174
-        */
+        /* 
+        Big Question:
+            How should I handle messages from different subnetworks? 
+            Can I just spawn another task within our event to handle the secure overlay?  
+            Or should i create a proxy to sit in between all TalkReqs and DAS + Secure DAS Subnetworks 
+            
+            See Trin: https://github.com/ethereum/trin/blob/master/trin-core/src/portalnet/discovery.rs#L174
+         */
+        
+         // This is the server side of our nodes. Instantiates task manager to continually process ALL messages for each node.
         tokio::spawn(async move {
             loop {
-                println!("Spawn our task!");  
                 select! {
                     // Discv5: 
                     //      Implement discv5 message processing used in DAS Prototype.
@@ -140,8 +143,8 @@ async fn main() {
                 }
             } 
         });
-    */   
     }
+    
     // Populates our nodes' routing tables.   
     for i in 0..NUMBER_OF_NODES {
         populate_routing_table(i, nodes.clone());
@@ -185,8 +188,7 @@ async fn create_node(i: u16) -> (
     // 1. Discovery Protocol 
     let discovery = discovery::create_discovery(i).await;
   
-    // Get rid of UTP logic!!!
-    // Create uTP channel for overlay messaging.  What's the deal with this vs the overlay? 
+    // Create uTP channel for overlay messaging
     let ( utp_events_tx, 
             utp_listener_tx, mut utp_listener_rx, 
             mut utp_listener,
