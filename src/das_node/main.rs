@@ -15,26 +15,24 @@ use discv5_overlay::{
             messages::ProtocolId
         }, 
     },
-    utp::stream::{UtpListener, UtpListenerRequest, UtpListenerEvent}
+    utp::stream::{UtpListener, UtpListenerEvent}
 };
-use futures::stream::{FuturesOrdered, FuturesUnordered};
-use futures::{AsyncWriteExt, FutureExt, StreamExt};  //pin_mut
+use futures::StreamExt; 
 use rand::Rng;
-use std::env;
 use std::str::FromStr;
 use tokio::{
     select, 
     sync::mpsc::{UnboundedReceiver, UnboundedSender}
 };
 use tokio_stream::wrappers::ReceiverStream;
-use tracing::{debug, info};
+use tracing;
 use tracing::log::error;
 
 use crate::das_node::{
     discovery,
     node_struct::DASNode,
     overlay, 
-    overlay::{
+    content_key::{
         DASContentKey, 
         DASValidator,
     }
@@ -48,12 +46,18 @@ const DAS_PROTOCOL_ID: &str = "DAS";
     Goals: 
         - Create DASNodes that contain the protocols and subprotocols listed above.  
         - Pass information back and forth between these created nodes via overlay 
-               "The request is TALKREQ [ req-id, protocol, data ]" <-- https://github.com/ethereum/devp2p/issues/156
+               "The request is TALKREQ [ req-id, protocol, data ]" --> https://github.com/ethereum/devp2p/issues/156
         - Design the code to be easily understandable (educational resource) 
 
     Questions:
-        What all do I need to do to make custom overlay networks?
-
+        - What all do I need to do to make custom overlay networks?
+            1. Create second content key for SecureDAS overlay network! 
+            2. Set up a proxy to filter all discv5 talkreqs to the proper overlay specific request handling logic.
+               See PortalnetEvents:  https://github.com/ethereum/trin/blob/master/trin-core/src/portalnet/events.rs#L11
+             
+    Notes:
+        - UTP channels aren't going to be used at all within this repo.  Just instantiating them where needed so I don't have
+          to modify overlay logic
 */
 
 
@@ -135,8 +139,10 @@ async fn main() {
                     //      Add other overlay message types (Line 324 of Model DAS) 
                     Some(command) = overlay_service.command_rx.recv() => {
                         match command {
-                            // Print something here bc idk if this is reacting
-                            OverlayCommand::Request(request) => overlay_service.process_request(request), 
+                            OverlayCommand::Request(request) => { 
+                                println!("Processing Overlay Request"); 
+                                overlay_service.process_request(request)
+                            }, 
                             _ => {}    
                         }
                     }
@@ -210,7 +216,6 @@ async fn create_node(i: u16) -> (
     // Creates node (Timofey creates node with utp_listener_tx) 
     let mut my_node = DASNode::new(discovery, overlay);
     
-    // utp_events_tx and utp_listener_rx are used within each node's message processing.
     (
         my_node,
         overlay_service,

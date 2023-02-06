@@ -12,6 +12,7 @@ discv5 = "0.1"
 discv5-overlay = {git = "https://github.com/timoth-y/discv5-overlay" }
 eth2_ssz = "0.4.0"
 eth2_ssz_derive = "0.3.0"
+futures = "0.3.24"
 hex = "0.4.3"
 parking_lot = "0.11.2"
 rand = "0.8.5"

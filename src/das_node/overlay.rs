@@ -1,5 +1,3 @@
-use async_trait::async_trait;
-use discv5::TalkRequest;
 use discv5_overlay::{
     portalnet::{
         discovery::Discovery,
@@ -10,119 +8,54 @@ use discv5_overlay::{
         overlay_service::OverlayService,
         storage::{DistanceFunction, MemoryContentStore},
         types::{
-            content_key::OverlayContentKey,
             distance::{Distance, XorMetric},
             messages::ProtocolId
         }
     },
-    types::validation::Validator,
-    utp::stream::{
-        UtpListener,
-        UtpListenerEvent, 
-        UtpListenerRequest
-    },
+    utp::stream::UtpListenerRequest,
 };
 use std::{
-    fmt,
-    fmt::{Display, Formatter},
     sync::Arc,
     time::Duration
 };
-use ssz::{Decode, Encode};
-use ssz_derive::{Decode, Encode};
-use tokio::sync::{
-    mpsc,
-    mpsc::{UnboundedReceiver, UnboundedSender}
+use tokio::sync::mpsc;
+
+use crate::das_node::{
+    content_key::{
+        DASContentKey,
+        DASValidator,
+    } 
 };
 
 const DAS_PROTOCOL_ID: &str = "DAS";
 
-// Copy + pasted DASContentKey + DASValidator traits from Model-DAS's overlay.rs
-
-/// A content key in the DAS overlay network.
-#[derive(Clone, Debug, Decode, Encode, PartialEq)]
-#[ssz(enum_behaviour = "union")]
-pub enum DASContentKey {
-    Sample([u8; 32]),
-}
-
-#[allow(clippy::from_over_into)]
-impl Into<Vec<u8>> for DASContentKey {
-    fn into(self) -> Vec<u8> {
-        self.as_ssz_bytes()
-    }
-}
-
-impl TryFrom<Vec<u8>> for DASContentKey {
-    type Error = &'static str;
-
-    fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
-        match DASContentKey::from_ssz_bytes(&value) {
-            Ok(key) => Ok(key),
-            Err(_err) => {
-                println!("unable to decode DASContentKey");
-                Err("Unable to decode SSZ")
-            }
-        }
-    }
-}
-
-impl Display for DASContentKey {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let s = match self {
-            Self::Sample(b) => format!("sample: {}", hex::encode(b)),
-        };
-
-        write!(f, "{}", s)
-    }
-}
-
-impl OverlayContentKey for DASContentKey {
-    fn content_id(&self) -> [u8; 32] {
-        match self {
-            DASContentKey::Sample(b) => b.clone(),
-        }
-    }
-}
-
-pub struct DASValidator;
-
-#[async_trait]
-impl Validator<DASContentKey> for DASValidator {
-    async fn validate_content(
-        &self,
-        content_key: &DASContentKey,
-        content: &[u8],
-    ) -> anyhow::Result<()>
-// where
-        //     DASContentKey: 'async_trait,
-    {
-        match content_key {
-            DASContentKey::Sample(_) => Ok(()),
-        }
-    }
-}
-
 
 /*
     Goal: 
-        Understand how these utp channels work to facilitate overlay communication
+        Create our subnetworks via the overlay protocol 
 
-    Notes:
-        - E&T use the uTP protocol for reliable message passing over UDP.
-              Check out the reasons why reliable messaging is needed in DAS --> https://hackmd.io/@timofey/SyqzhA4vo#712-Reliable-UDP-over-Discv5
-    Questions:
-        - Should our create_overlay() also spawn our client task manager? 
-        - What are our message tasks?  What is our client task? 
-
-    The Overlay protocol is a layer on top of discv5 that handles all requests from the overlay networks
+    "The Overlay protocol is a layer on top of discv5 that handles all requests from the overlay networks
     (state, history etc.) and dispatch them to the discv5 protocol TalkReq. Each network should
     implement the overlay protocol and the overlay protocol is where we can encapsulate the logic for
-    handling common network requests/responses.
+    handling common network requests/responses."  -Trin repo
 */
 
-// Make more generalizable content keys so i can reuse this function for secondary overlay...  -->  <TContentKey, TStore, etc.>  
-// Look at overlay protocol! 
+
+/*
+How can I make more generalizable content keys so i can reuse this function for secure overlay?  -->  <TContentKey, TStore, etc.>  
+Maybe take in our content key as a parameter.  Look at overlay protocol!
+
+This may help... Found in Trin's overlay service
+
+impl<
+        TContentKey: 'static + OverlayContentKey + Send + Sync,
+        TMetric: Metric + Send + Sync,
+        TValidator: 'static + Validator<TContentKey> + Send + Sync,
+        TStore: 'static + ContentStore + Send + Sync,
+    > OverlayService<TContentKey, TMetric, TValidator, TStore>
+*/
+
+
 pub async fn create_overlay(discovery: Arc<Discovery>, utp_listener_tx: mpsc::UnboundedSender<UtpListenerRequest>) -> ( 
     Arc<OverlayProtocol<DASContentKey, XorMetric, DASValidator, MemoryContentStore>>, 
     OverlayService<DASContentKey, XorMetric, DASValidator, MemoryContentStore>

@@ -539,6 +539,7 @@ dependencies = [
  "discv5-overlay",
  "eth2_ssz",
  "eth2_ssz_derive",
+ "futures 0.3.25",
  "hex",
  "parking_lot 0.11.2",
  "rand 0.8.5",
