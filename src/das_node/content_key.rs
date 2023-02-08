@@ -12,17 +12,27 @@ use ssz_derive::{Decode, Encode};
 
 
 
-// Content keys are used to request or offer specific content data through discv5.  
+// Content keys are used to request or offer specific content data through discv5.  Certain overlay networks allow
+// communication of certain types of content. 
 // Discv5 TalkReq/TalkResp uses these keys to know which overlay-specific req handling logic is needed
 
-// To Do:
-// Figure out how I can aggregate the two keys logic
+// Why is DASContentKey's UnboundedSender generic over some type UtpListenerRequest?
 
 // Can I pass TContentKey into our implementations?  If this works, we'll be able to plug in TContentKey instead of doubling up logic here
 // and within our overlay.rs!
+
+// To Do:
+//      Consolidate logic
+
+//  I don't believe we need to define our generics... They're defined within function/type definitions~! 
 // pub enum TContentKey {
 //     DASContentKey,
 //     SecureDASContent,
+// }
+
+// pub enum TValidator {
+//     DASValidator,
+//     SecureDASValidator,
 // }
 
 

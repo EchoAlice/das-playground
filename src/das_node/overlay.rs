@@ -24,10 +24,15 @@ use crate::das_node::{
     content_key::{
         DASContentKey,
         DASValidator,
+        SecureDASContentKey, 
+        SecureDASValidator, 
+        // TContentKey,
+        // TValidator,
     } 
 };
 
 const DAS_PROTOCOL_ID: &str = "DAS";
+const SECURE_DAS_PROTOCOL_ID: &str = "SECURE_DAS";
 
 
 /*
@@ -45,20 +50,16 @@ const DAS_PROTOCOL_ID: &str = "DAS";
 How can I make more generalizable content keys so i can reuse this function for secure overlay?  -->  <TContentKey, TStore, etc.>  
 Maybe take in our content key as a parameter.  Look at overlay protocol!
 
-This may help... Found in Trin's overlay service
-
-impl<
-        TContentKey: 'static + OverlayContentKey + Send + Sync,
-        TMetric: Metric + Send + Sync,
-        TValidator: 'static + Validator<TContentKey> + Send + Sync,
-        TStore: 'static + ContentStore + Send + Sync,
-    > OverlayService<TContentKey, TMetric, TValidator, TStore>
 */
 
+// Modify parameters and return values of the function with generics.
 
-pub async fn create_overlay(discovery: Arc<Discovery>, utp_listener_tx: mpsc::UnboundedSender<UtpListenerRequest>) -> ( 
-    Arc<OverlayProtocol<DASContentKey, XorMetric, DASValidator, MemoryContentStore>>, 
-    OverlayService<DASContentKey, XorMetric, DASValidator, MemoryContentStore>
+pub async fn create_overlay<TContentKey, TValidator>(discovery: Arc<Discovery>, protocol: ProtocolId, validator:Arc<TValidator>, utp_listener_tx: mpsc::UnboundedSender<UtpListenerRequest>) -> ( 
+// pub async fn create_overlay<TContentKey, TValidator>(discovery: Arc<Discovery>, utp_listener_tx: mpsc::UnboundedSender<UtpListenerRequest>) -> ( 
+    // Arc<OverlayProtocol<DASContentKey, XorMetric, DASValidator, MemoryContentStore>>, 
+    // OverlayService<DASContentKey, XorMetric, DASValidator, MemoryContentStore>,
+    Arc<OverlayProtocol<TContentKey, XorMetric, TValidator, MemoryContentStore>>, 
+    OverlayService<TContentKey, XorMetric, TValidator, MemoryContentStore>,
     ) { 
     let config = OverlayConfig {
         bootnode_enrs: discovery.clone().discv5.table_entries_enr(),
@@ -68,15 +69,51 @@ pub async fn create_overlay(discovery: Arc<Discovery>, utp_listener_tx: mpsc::Un
         query_peer_timeout: Duration::from_secs(30),
         ..Default::default()
     };
-    let protocol = ProtocolId::Custom(DAS_PROTOCOL_ID.to_string());
+    
+    // Modify logic 
+    // let protocol = ProtocolId::Custom(DAS_PROTOCOL_ID.to_string());
+    // let protocol = ProtocolId::Custom(SECURE_DAS_PROTOCOL_ID.to_string());
+
     let storage = {
         Arc::new(parking_lot::RwLock::new(MemoryContentStore::new(
             discovery.discv5.local_enr().node_id(),
             DistanceFunction::Xor,
         )))
     };
-    let validator = Arc::new(DASValidator);
+    
+    // Modify logic. 
+    // Use this IF we decide to return an enum and can't figure out how to add the validtaor<> trait to our generi trait    
 
+    // Maybe if we can tell which protocol is being implemented, we can assert that our validator is either DAS or SecureDAS
+    // Would this require us to create and return an enum OverlayType?
+    
+    // The Validator type is what's telling our OverlayProtocol::new( ) the type of overlay we're creating
+    // let validator = Arc::new(DASValidator);
+    // let validator = Arc::new(SecureDASValidator);
+    // match protocol {
+    //     ProtocolId::Custom(DAS_PROTOCOL_ID.to_string()) => {
+    //         println!("DAS Protocol")
+    //     },
+    //     ProtocolId::Custom(SECURE_DAS_PROTOCOL_ID.to_string()) => {
+    //         println!("Secure DAS Protocol")
+    //     },
+    //     _ => {} 
+    // }
+
+
+    // Do we need to modify our OverlayProtocol's constructor?
+    /*
+    pub fn new(
+        config: OverlayConfig,
+        discovery: Arc<Discovery>,
+        utp_listener_tx: UnboundedSender<UtpListenerRequest>,
+        store: Arc<RwLock<TStore>>,
+        data_radius: Distance,
+        protocol: ProtocolId,
+        validator: Arc<TValidator>,
+    ) -> (Self, OverlayService<TContentKey, TMetric, TValidator, TStore>) {    
+    */
+   
     let (overlay, service) = OverlayProtocol::new(
         config,
         discovery.clone(),
@@ -86,7 +123,7 @@ pub async fn create_overlay(discovery: Arc<Discovery>, utp_listener_tx: mpsc::Un
         protocol,
         validator,
     );
-    
+   
     let overlay = Arc::new(overlay);
     ( 
         overlay, 

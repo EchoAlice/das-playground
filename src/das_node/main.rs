@@ -19,7 +19,10 @@ use discv5_overlay::{
 };
 use futures::StreamExt; 
 use rand::Rng;
-use std::str::FromStr;
+use std::{
+    str::FromStr,
+    sync::Arc,
+};
 use tokio::{
     select, 
     sync::mpsc::{UnboundedReceiver, UnboundedSender}
@@ -33,13 +36,19 @@ use crate::das_node::{
     node_struct::DASNode,
     overlay, 
     content_key::{
+        // TContentKey,
+        // TValidator, 
         DASContentKey, 
         DASValidator,
+        // SecureDASContentKey,
+        SecureDASValidator,
     }
 };
 
 pub const NUMBER_OF_NODES: usize = 10;
 const DAS_PROTOCOL_ID: &str = "DAS";
+const SECURE_DAS_PROTOCOL_ID: &str = "SECURE_DAS";
+
 
 
 /*
@@ -58,6 +67,7 @@ const DAS_PROTOCOL_ID: &str = "DAS";
     Notes:
         - UTP channels aren't going to be used at all within this repo.  Just instantiating them where needed so I don't have
           to modify overlay logic
+        - Discv5 IP addresses might be wrong
 */
 
 
@@ -127,6 +137,27 @@ async fn main() {
 
                                         return;
                                     }
+
+                                    // See if we can watch for a secure overlay event.  Create
+                                    if protocol == ProtocolId::Custom(SECURE_DAS_PROTOCOL_ID.to_string()) {
+                                        println!("Enters DAS Protocol");  
+                                        let talk_resp = match node.overlay.process_one_request(&req).await {
+                                            Ok(response) => discv5_overlay::portalnet::types::messages::Message::from(response).into(),
+                                            Err(err) => {
+                                                error!("Node {chan} Error processing request: {err}");
+                                                return;
+                                            },
+                                        };
+
+                                        if let Err(err) = req.respond(talk_resp) {
+                                            println!("Error");  
+                                            error!("Unable to respond to talk request: {}", err);
+                                            return;
+                                        }
+
+                                        return;
+                                    }
+
                                     // let resp = handle_talk_request(req.node_id().clone(), req.protocol(), req.body().to_vec(), node, opts, enr_to_libp2p, node_ids, i).await;
                                     // let resp = handle_talk_request(req.node_id().clone(), req.protocol(), req.body().to_vec(), node).await;
                                     // req.respond(resp);
@@ -146,6 +177,8 @@ async fn main() {
                             _ => {}    
                         }
                     }
+                    
+
                 }
             } 
         });
@@ -178,6 +211,9 @@ async fn main() {
         println!("Discovery and overlay protocol *structs* are not instantiated")
     };
     println!("Discovery Enr: {}", nodes[2].discovery.local_enr());
+
+    // println!("Overlay Protocol ID: {}") = nodes[2].overlay.protocol(); 
+
 }
 
 
@@ -185,9 +221,12 @@ async fn main() {
 
 
 
-async fn create_node(i: u16) -> (
-        DASNode,
+// async fn create_node<TContentKey, TValidator>(i: u16) -> (
+async fn create_node<TContentKey, TValidator>(i: u16) -> (
+        DASNode, 
+        // OverlayService<TContentKey, XorMetric, TValidator, MemoryContentStore>,
         OverlayService<DASContentKey, XorMetric, DASValidator, MemoryContentStore>,
+        // OverlayService<SecureDASContentKey, XorMetric, SecureDASValidator, MemoryContentStore>,
         UnboundedSender<TalkRequest>,
         UnboundedReceiver<UtpListenerEvent>
     ) {
@@ -200,13 +239,25 @@ async fn create_node(i: u16) -> (
             mut utp_listener,
     ) = UtpListener::new(discovery.clone());
 
-    // Starts the main uTP service used to listen and handle all uTP connections and streams.
-    // The utp listener accepts inbound uTP sockets (first thing).  
-    // Where should the listener be started + stored?  Investigate details of UTPListener.start()
+    // ***Ignore UTP code!***
     tokio::spawn(async move { utp_listener.start().await });
     
-    // 2. Instantiates our Overlay Protocol.  Return our overlay and overlay service! (overlay goes inside DASNode) 
-    let (overlay, overlay_service) = overlay::create_overlay(discovery.clone(), utp_listener_tx).await;  
+    // Modifying logic 
+    // 2. Instantiates our Overlay Protocol.  Return our overlay and overlay service! (overlay protocol struct goes inside DASNode)
+    let das_protocol = ProtocolId::Custom(DAS_PROTOCOL_ID.to_string());
+    let das_validator = Arc::new(DASValidator);
+    let (overlay, overlay_service) = overlay::create_overlay(discovery.clone(), das_protocol, das_validator, utp_listener_tx).await;  
+    
+    // 3. Instantiate our Secure Overlay Protocol
+    // ***The Validator type what tells our OverlayProtocol::new( ) the type of overlay we're creating!
+    // let secure_protocol = ProtocolId::Custom(SECURE_DAS_PROTOCOL_ID.to_string());
+    // let secure_das_validator = Arc::new(SecureDASValidator);
+    // let (overlay, overlay_service) = overlay::create_overlay(discovery.clone(), secure_protocol, secure_das_validator, utp_listener_tx).await;  
+    
+    
+    // let (overlay, overlay_service) = overlay::create_overlay(discovery.clone(), utp_listener_tx).await;  
+
+
 
     //  Samples: TODO
     
