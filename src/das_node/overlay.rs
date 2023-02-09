@@ -26,9 +26,7 @@ use crate::das_node::{
         DASValidator,
         SecureDASContentKey, 
         SecureDASValidator, 
-        ValidatorType, 
-        // TContentKey,
-        // TValidator,
+        // ValidatorType, 
     } 
 };
 
@@ -44,13 +42,23 @@ const SECURE_DAS_PROTOCOL_ID: &str = "SECURE_DAS";
     -Trin repo
 
 
-    Currently modifying parameters and return values of the function with generics!
+Note:
+    - Currently modifying parameters and return values of the function with generics!
+    - The Validator type what tells our OverlayProtocol::new( ) the type of overlay we're creating!
 */
 
 
+
+
+/*
+//-----------------------------
+// GENERALIZE OVERLAY CREATION
+//-----------------------------
+//
 // Passes in an enum as our validator type
 // pub async fn create_overlay<TContentKey, TValidator>(discovery: Arc<Discovery>, protocol: ProtocolId, validator:Arc<ValidatorType>, utp_listener_tx: mpsc::UnboundedSender<UtpListenerRequest>) -> ( 
-// This one's our superstar
+
+// This function definition feels right
 pub async fn create_overlay<TContentKey, TValidator>(discovery: Arc<Discovery>, protocol: ProtocolId, validator:Arc<TValidator>, utp_listener_tx: mpsc::UnboundedSender<UtpListenerRequest>) -> ( 
     Arc<OverlayProtocol<TContentKey, XorMetric, TValidator, MemoryContentStore>>, 
     OverlayService<TContentKey, XorMetric, TValidator, MemoryContentStore>,
@@ -79,7 +87,11 @@ pub async fn create_overlay<TContentKey, TValidator>(discovery: Arc<Discovery>, 
     //     },
     //     _ => {} 
     // }
-   
+  
+    // This shouldn't be here.  Testing what happens when "TValidator<>" trait bound errors aren't happening
+    let protocol = ProtocolId::Custom(DAS_PROTOCOL_ID.to_string());
+    let validator = Arc::new(DASValidator);
+
     let (overlay, service) = OverlayProtocol::new(
         config,
         discovery.clone(),
@@ -96,3 +108,98 @@ pub async fn create_overlay<TContentKey, TValidator>(discovery: Arc<Discovery>, 
         service 
     )
 }
+*/
+
+
+
+
+
+// -----------------------------------
+//         INTERMEDIATE PHASE
+//
+// Just implement overlays seperately.
+// -----------------------------------
+//
+// I'm spending a lot of time on complexities within Rust.  Make simple overlay creation functions for now.
+// Circle back once I've implemented the message proxy
+pub async fn create_das_overlay(discovery: Arc<Discovery>, utp_listener_tx: mpsc::UnboundedSender<UtpListenerRequest>) -> (
+    Arc<OverlayProtocol<DASContentKey, XorMetric, DASValidator, MemoryContentStore>>, 
+    OverlayService<DASContentKey, XorMetric, DASValidator, MemoryContentStore>,
+){
+    let config = OverlayConfig {
+        bootnode_enrs: discovery.clone().discv5.table_entries_enr(),
+        ping_queue_interval: Some(Duration::from_secs(10000)),
+        query_num_results: usize::MAX,
+        query_timeout: Duration::from_secs(60),
+        query_peer_timeout: Duration::from_secs(30),
+        ..Default::default()
+    };
+
+    let storage = {
+        Arc::new(parking_lot::RwLock::new(MemoryContentStore::new(
+            discovery.discv5.local_enr().node_id(),
+            DistanceFunction::Xor,
+        )))
+    };
+  
+    let protocol = ProtocolId::Custom(DAS_PROTOCOL_ID.to_string());
+    let validator = Arc::new(DASValidator);
+
+    let (overlay, service) = OverlayProtocol::new(
+        config,
+        discovery.clone(),
+        utp_listener_tx,
+        storage,
+        Distance::MAX,
+        protocol,
+        validator,
+    );
+   
+    let overlay = Arc::new(overlay);
+    ( 
+        overlay, 
+        service 
+    )
+} 
+
+
+pub async fn create_secure_das_overlay(discovery: Arc<Discovery>, utp_listener_tx: mpsc::UnboundedSender<UtpListenerRequest>) -> (
+    Arc<OverlayProtocol<SecureDASContentKey, XorMetric, SecureDASValidator, MemoryContentStore>>, 
+    OverlayService<SecureDASContentKey, XorMetric, SecureDASValidator, MemoryContentStore>,
+){
+
+        let config = OverlayConfig {
+        bootnode_enrs: discovery.clone().discv5.table_entries_enr(),
+        ping_queue_interval: Some(Duration::from_secs(10000)),
+        query_num_results: usize::MAX,
+        query_timeout: Duration::from_secs(60),
+        query_peer_timeout: Duration::from_secs(30),
+        ..Default::default()
+    };
+
+    let storage = {
+        Arc::new(parking_lot::RwLock::new(MemoryContentStore::new(
+            discovery.discv5.local_enr().node_id(),
+            DistanceFunction::Xor,
+        )))
+    };
+  
+    let protocol = ProtocolId::Custom(SECURE_DAS_PROTOCOL_ID.to_string());
+    let validator = Arc::new(SecureDASValidator);
+
+    let (overlay, service) = OverlayProtocol::new(
+        config,
+        discovery.clone(),
+        utp_listener_tx,
+        storage,
+        Distance::MAX,
+        protocol,
+        validator,
+    );
+   
+    let overlay = Arc::new(overlay);
+    ( 
+        overlay, 
+        service 
+    )
+} 

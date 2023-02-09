@@ -36,11 +36,9 @@ use crate::das_node::{
     node_struct::DASNode,
     overlay, 
     content_key::{
-        // TContentKey,
-        // TValidator, 
         DASContentKey, 
         DASValidator,
-        // SecureDASContentKey,
+        SecureDASContentKey,
         SecureDASValidator,
     }
 };
@@ -80,8 +78,10 @@ async fn main() {
     
     // Instantiates protocol structs and message processing within each node
     for i in 0..NUMBER_OF_NODES {
-        let (starter_node, 
-            mut overlay_service, 
+        let (
+            starter_node, 
+            mut overlay_service,
+            mut secure_overlay_service, 
             utp_events_tx, 
             utp_listener_rx
         ) = create_node(i as u16).await;
@@ -112,7 +112,6 @@ async fn main() {
                         let chan = format!("{i} {}", node.discovery.discv5.local_enr().node_id().to_string());
                         match event {
                             Discv5Event::TalkRequest(req) => {
-                                println!("Our node's enr inside of task: {:?}", node.discovery.local_enr());
                                 println!("Stream {}: Discv5 TalkReq received", chan);  
                                 
                                 let node = node.clone(); 
@@ -138,10 +137,11 @@ async fn main() {
                                         return;
                                     }
 
-                                    // See if we can watch for a secure overlay event.  Create
+                                    // See if we can watch for a secure overlay event.
                                     if protocol == ProtocolId::Custom(SECURE_DAS_PROTOCOL_ID.to_string()) {
-                                        println!("Enters DAS Protocol");  
+                                        println!("Enters SecureDAS Protocol");  
                                         let talk_resp = match node.overlay.process_one_request(&req).await {
+                                        // let talk_resp = match node.secure_overlay.process_one_request(&req).await {
                                             Ok(response) => discv5_overlay::portalnet::types::messages::Message::from(response).into(),
                                             Err(err) => {
                                                 error!("Node {chan} Error processing request: {err}");
@@ -177,8 +177,6 @@ async fn main() {
                             _ => {}    
                         }
                     }
-                    
-
                 }
             } 
         });
@@ -193,26 +191,18 @@ async fn main() {
     //================================ 
     //   Part 2: Node Communication
     //================================ 
-
-    // Creates simple communication between nodes 
+    // Creates simple communication between nodes.  We need to set up message processing for secure_overlay! 
     let result = nodes[1].overlay.send_ping(nodes[2].overlay.local_enr());
+    // let result = nodes[1].secure_overlay.send_ping(nodes[2].secure_overlay.local_enr());
     result.await;
-    
-    
-    // ***We can no longer run any code after awaiting our tasks.  The tasks are designed to never stop running! 
+   
     //================================ 
     //         Sanity Check 
     //================================ 
-    let discovery_enr = nodes[2].discovery.local_enr();
-    let overlay_enr = nodes[2].overlay.local_enr(); 
-    if discovery_enr == overlay_enr {
-        println!("Discovery and overlay protocol *structs* are instantiated")
-    } else {
-        println!("Discovery and overlay protocol *structs* are not instantiated")
-    };
-    println!("Discovery Enr: {}", nodes[2].discovery.local_enr());
-
-    // println!("Overlay Protocol ID: {}") = nodes[2].overlay.protocol(); 
+    // Must mute result.await to run sanity check 
+    println!("Discovery Enr: {:?}", nodes[2].discovery.local_enr());
+    println!("Overlay Protocol ID: {:?}", nodes[2].overlay.protocol()); 
+    println!("Overlay Protocol ID: {:?}", nodes[2].secure_overlay.protocol()); 
 
 }
 
@@ -221,43 +211,57 @@ async fn main() {
 
 
 
-// async fn create_node<TContentKey, TValidator>(i: u16) -> (
-async fn create_node<TContentKey, TValidator>(i: u16) -> (
+async fn create_node(i: u16) -> (
         DASNode, 
-        // OverlayService<TContentKey, XorMetric, TValidator, MemoryContentStore>,
         OverlayService<DASContentKey, XorMetric, DASValidator, MemoryContentStore>,
-        // OverlayService<SecureDASContentKey, XorMetric, SecureDASValidator, MemoryContentStore>,
+        OverlayService<SecureDASContentKey, XorMetric, SecureDASValidator, MemoryContentStore>,
         UnboundedSender<TalkRequest>,
         UnboundedReceiver<UtpListenerEvent>
     ) {
     // 1. Discovery Protocol 
+    //------------------------
     let discovery = discovery::create_discovery(i).await;
-  
-    // Create uTP channel for overlay messaging
+
+
+    // UTP Channels (Ignore)
+    // -----------------------
+    // DAS Overlay UTP Channel 
     let ( utp_events_tx, 
             utp_listener_tx, mut utp_listener_rx, 
             mut utp_listener,
     ) = UtpListener::new(discovery.clone());
-
-    // ***Ignore UTP code!***
     tokio::spawn(async move { utp_listener.start().await });
     
-    // Modifying logic 
-    // 2. Instantiates our Overlay Protocol.  Return our overlay and overlay service! (overlay protocol struct goes inside DASNode)
+    // Secure DAS Overlay UTP Channel 
+    let ( secure_utp_events_tx, 
+            secure_utp_listener_tx, mut secure_utp_listener_rx, 
+            mut secure_utp_listener,
+    ) = UtpListener::new(discovery.clone());
+    tokio::spawn(async move { secure_utp_listener.start().await });
+
+   
+    //--------------------
+    // INTERMEDIATE PHASE 
+    //--------------------
+    // 2. DAS Overlay Protocol   
+    let (overlay, overlay_service) = overlay::create_das_overlay(discovery.clone(), utp_listener_tx).await;  
+    // 3. Secure DAS Overlay Protocol   
+    let (secure_overlay, secure_overlay_service) = overlay::create_secure_das_overlay(discovery.clone(), secure_utp_listener_tx).await;  
+
+/*
+    //-----------------------------
+    // GENERALIZE OVERLAY CREATION
+    //-----------------------------
+    // 2. DAS Overlay Protocol   
     let das_protocol = ProtocolId::Custom(DAS_PROTOCOL_ID.to_string());
     let das_validator = Arc::new(DASValidator);
     let (overlay, overlay_service) = overlay::create_overlay(discovery.clone(), das_protocol, das_validator, utp_listener_tx).await;  
     
-    // 3. Instantiate our Secure Overlay Protocol
-    // ***The Validator type what tells our OverlayProtocol::new( ) the type of overlay we're creating!
-    // let secure_protocol = ProtocolId::Custom(SECURE_DAS_PROTOCOL_ID.to_string());
-    // let secure_das_validator = Arc::new(SecureDASValidator);
-    // let (overlay, overlay_service) = overlay::create_overlay(discovery.clone(), secure_protocol, secure_das_validator, utp_listener_tx).await;  
-    
-    
-    // let (overlay, overlay_service) = overlay::create_overlay(discovery.clone(), utp_listener_tx).await;  
-
-
+    // 3. Secure Overlay Protocol
+    let secure_protocol = ProtocolId::Custom(SECURE_DAS_PROTOCOL_ID.to_string());
+    let secure_das_validator = Arc::new(SecureDASValidator);
+    let (overlay, overlay_service) = overlay::create_overlay(discovery.clone(), secure_protocol, secure_das_validator, utp_listener_tx).await;  
+*/
 
     //  Samples: TODO
     
@@ -265,11 +269,12 @@ async fn create_node<TContentKey, TValidator>(i: u16) -> (
 
 
     // Creates node (Timofey creates node with utp_listener_tx) 
-    let mut my_node = DASNode::new(discovery, overlay);
+    let mut my_node = DASNode::new(discovery, overlay, secure_overlay);
     
     (
         my_node,
         overlay_service,
+        secure_overlay_service,
         utp_events_tx,
         utp_listener_rx
     ) 
