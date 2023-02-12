@@ -103,11 +103,49 @@ async fn main() {
          */
         
          // This is the server side of our nodes. Instantiates task manager to continually process ALL messages for each node.
+
+        // Should I spawn different tasks for each overlay? 
         tokio::spawn(async move {
             loop {
+                /// "Select!" randomly picks one of these match branches to process an event 
                 select! {
-                    // Discv5: 
-                    //      Implement discv5 message processing used in DAS Prototype.
+                    // =========================== 
+                    // Overlay Message Processing:  
+                    // =========================== 
+                    // Incoming message 
+                    Some(command) = overlay_service.command_rx.recv() => {
+                        match command {
+                            OverlayCommand::Request(request) => { 
+                                println!("Processing Overlay Request"); 
+                                overlay_service.process_request(request)
+                            }, 
+                            _ => {}    
+                        }
+                    }
+                    Some(response) = overlay_service.response_rx.recv() => {
+                        // Look up active request that corresponds to the response.
+                        let optional_active_request = overlay_service.active_outgoing_requests.write().remove(&response.request_id);
+                        if let Some(active_request) = optional_active_request {
+                            println!("Send overlay response (to responder?)");
+                            // Send response to responder if present.
+                            if let Some(responder) = active_request.responder {
+                                let _ = responder.send(response.response.clone());
+                            }
+
+                            // Perform background processing.
+                            match response.response {
+                                Ok(response) => overlay_service.process_response(response, active_request.destination, active_request.request, active_request.query_id),
+                                Err(error) => overlay_service.process_request_failure(response.request_id, active_request.destination, error),
+                            }
+
+                        } else {
+                            println!("No request found for response");
+                        }
+                    } 
+                    // ==========================
+                    // Discv5 Message Processing: 
+                    // ==========================
+                    // Incoming event
                     Some(event) = event_str.next() => {
                         let chan = format!("{i} {}", node.discovery.discv5.local_enr().node_id().to_string());
                         match event {
@@ -166,17 +204,6 @@ async fn main() {
                             _ => {}    
                         }
                     },
-                    // Overlay:  
-                    //      Add other overlay message types (Line 324 of Model DAS) 
-                    Some(command) = overlay_service.command_rx.recv() => {
-                        match command {
-                            OverlayCommand::Request(request) => { 
-                                println!("Processing Overlay Request"); 
-                                overlay_service.process_request(request)
-                            }, 
-                            _ => {}    
-                        }
-                    }
                 }
             } 
         });
@@ -192,15 +219,18 @@ async fn main() {
     //   Part 2: Node Communication
     //================================ 
     // Creates simple communication between nodes.  We need to set up message processing for secure_overlay! 
-    let result = nodes[1].overlay.send_ping(nodes[2].overlay.local_enr());
-    // let result = nodes[1].secure_overlay.send_ping(nodes[2].secure_overlay.local_enr());
-    result.await;
-   
+    // Can we do this concurrently? 
+    let das_result = nodes[1].overlay.send_ping(nodes[2].overlay.local_enr());
+    das_result.await;
+    let secure_das_result = nodes[1].secure_overlay.send_ping(nodes[2].secure_overlay.local_enr());
+    secure_das_result.await;
+    
+
     //================================ 
     //         Sanity Check 
     //================================ 
-    // Must mute result.await to run sanity check 
-    println!("Discovery Enr: {:?}", nodes[2].discovery.local_enr());
+    // println!("\n"); 
+    // println!("Discovery Enr: {:?}", nodes[2].discovery.local_enr());
     println!("Overlay Protocol ID: {:?}", nodes[2].overlay.protocol()); 
     println!("Overlay Protocol ID: {:?}", nodes[2].secure_overlay.protocol()); 
 
