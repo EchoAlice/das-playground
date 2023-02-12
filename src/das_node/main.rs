@@ -86,7 +86,7 @@ async fn main() {
             utp_listener_rx
         ) = create_node(i as u16).await;
       
-        // Idk if we can obtain the event stream using discovery.start() instead of discv5.start() 
+        // I don't think we can obtain the event stream using discovery.start() instead of discv5.start() 
         let mut event_str = ReceiverStream::new(starter_node.discovery.discv5.event_stream().await.unwrap());
 
         // It doesn't feel clean copying the entire node to pass info into our task manager  :P 
@@ -112,7 +112,7 @@ async fn main() {
                     // =========================== 
                     // Overlay Message Processing:  
                     // =========================== 
-                    // Incoming message 
+                    // Request 
                     Some(command) = overlay_service.command_rx.recv() => {
                         match command {
                             OverlayCommand::Request(request) => { 
@@ -122,11 +122,13 @@ async fn main() {
                             _ => {}    
                         }
                     }
+                    // Response 
                     Some(response) = overlay_service.response_rx.recv() => {
                         // Look up active request that corresponds to the response.
                         let optional_active_request = overlay_service.active_outgoing_requests.write().remove(&response.request_id);
                         if let Some(active_request) = optional_active_request {
-                            println!("Send overlay response (to responder?)");
+                            println!("Send overlay response");
+                            println!("\n");
                             // Send response to responder if present.
                             if let Some(responder) = active_request.responder {
                                 let _ = responder.send(response.response.clone());
@@ -136,6 +138,41 @@ async fn main() {
                             match response.response {
                                 Ok(response) => overlay_service.process_response(response, active_request.destination, active_request.request, active_request.query_id),
                                 Err(error) => overlay_service.process_request_failure(response.request_id, active_request.destination, error),
+                            }
+
+                        } else {
+                            println!("No request found for response");
+                        }
+                    } 
+                    // ================================== 
+                    // Secure Overlay Message Processing:  
+                    // ================================== 
+                    // Request 
+                    Some(command) = secure_overlay_service.command_rx.recv() => {
+                        match command {
+                            OverlayCommand::Request(request) => { 
+                                println!("Processing Secure Overlay Request"); 
+                                secure_overlay_service.process_request(request)
+                            }, 
+                            _ => {}    
+                        }
+                    }
+                    // Response 
+                    Some(response) = secure_overlay_service.response_rx.recv() => {
+                        // Look up active request that corresponds to the response.
+                        let optional_active_request = secure_overlay_service.active_outgoing_requests.write().remove(&response.request_id);
+                        if let Some(active_request) = optional_active_request {
+                            println!("Send secure overlay response");
+                            println!("\n");
+                            // Send response to responder if present.
+                            if let Some(responder) = active_request.responder {
+                                let _ = responder.send(response.response.clone());
+                            }
+
+                            // Perform background processing.
+                            match response.response {
+                                Ok(response) => secure_overlay_service.process_response(response, active_request.destination, active_request.request, active_request.query_id),
+                                Err(error) => secure_overlay_service.process_request_failure(response.request_id, active_request.destination, error),
                             }
 
                         } else {
@@ -214,16 +251,41 @@ async fn main() {
         populate_routing_table(i, nodes.clone());
     }
 
+    // Can we look at our nodes' routing tables?  There are currently no bucket entries!!!
+    println!("Overlay Bucket Entries: {:?}", nodes[2].overlay.bucket_entries()); 
+    println!("\n");
 
-    //================================ 
+
+
+
+    //================================== 
     //   Part 2: Node Communication
-    //================================ 
-    // Creates simple communication between nodes.  We need to set up message processing for secure_overlay! 
-    // Can we do this concurrently? 
+    // (implement concurrent comm later)
+    //================================== 
+    // Creates simple communication between nodes.    
+    // Overlay Protocol struct --> calls our Overlay Service   
+  
+    // ------------------ 
+    // Overlay Messaging
+    // ------------------ 
+    // Sends ping
     let das_result = nodes[1].overlay.send_ping(nodes[2].overlay.local_enr());
     das_result.await;
+    // Send find nodes 
+    
+    // Send find content 
+   
+    // -------------------------- 
+    // Secure Overlay Messaging
+    // -------------------------- 
+    // Send ping
     let secure_das_result = nodes[1].secure_overlay.send_ping(nodes[2].secure_overlay.local_enr());
     secure_das_result.await;
+    
+    // Send find nodes 
+    
+    // Send find content 
+    // secure_das_result.await;
     
 
     //================================ 
