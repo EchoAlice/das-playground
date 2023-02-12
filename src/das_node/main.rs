@@ -260,11 +260,12 @@ async fn main() {
 
     //================================== 
     //   Part 2: Node Communication
-    // (implement concurrent comm later)
     //================================== 
-    // Creates simple communication between nodes.    
-    // Overlay Protocol struct --> calls our Overlay Service   
-  
+    /* Creates simple communication between nodes. We need to pass our overlay messages 
+       through peers' routing tables.  Implement concurrent communication later.     
+    
+       Overlay Protocol struct --> calls our Overlay Service   
+    */
     // ------------------ 
     // Overlay Messaging
     // ------------------ 
@@ -278,23 +279,20 @@ async fn main() {
     // -------------------------- 
     // Secure Overlay Messaging
     // -------------------------- 
-    // Send ping
+    // Sends ping
     let secure_das_result = nodes[1].secure_overlay.send_ping(nodes[2].secure_overlay.local_enr());
     secure_das_result.await;
     
     // Send find nodes 
     
     // Send find content 
-    // secure_das_result.await;
     
 
     //================================ 
     //         Sanity Check 
     //================================ 
-    // println!("\n"); 
-    // println!("Discovery Enr: {:?}", nodes[2].discovery.local_enr());
     println!("Overlay Protocol ID: {:?}", nodes[2].overlay.protocol()); 
-    println!("Overlay Protocol ID: {:?}", nodes[2].secure_overlay.protocol()); 
+    println!("Secure Overlay Protocol ID: {:?}", nodes[2].secure_overlay.protocol()); 
 
 }
 
