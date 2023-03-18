@@ -16,18 +16,25 @@ use std::{
 
 
 /*
-    The Node Discovery Protocol v5 (discv5) is the p2p network that Ethereum Nodes use
+    The Node Discovery Protocol v5 (discv5) is the UDP-based p2p network that Ethereum Nodes use
     to establish network connections with other nodes.  It acts as a database of all live nodes
     in the network, performing 3 main functions:
         1. Sampling the set of all live node
         2. Searching for nodes providing a certain service (topic advertisement) 
         3. Authoratative resolution of node records with a node's id
+
+    Discv5 implements message passing via UDP transport!  
+        This allows for fast ping/pong message between nodes (necessary to establish real connection).
+        A more formal connection via TCP (or UTP wrt DAS Prototype + Trin?) is then established.
+        
+        "For discovery, where a node simply wants to make its presence known in order to then 
+            establish a formal connection with a peer, UDP is sufficient"
 */
 
-// This function creates the discv5 service + main discovery protocol for a node! 
+// This function creates the discv5 service + main discovery protocol struct for a node! 
 pub async fn create_discovery(i: u16) -> Arc<Discovery> {
-    // A node using the discovery protocol needs to provide an IP address and UDP port to have its record relayed in the DHT
-    // Do we need to have incremental IP addresses?
+    // UDP port to find peers  +  IP address to connect to peers to have its record relayed in the DHT
+    // I believe this is a client-side (ephemeral) port 
     let port_start = 9000 + i;
     let listen_ip = String::from("127.0.0.1").parse::<Ipv4Addr>().unwrap(); 
 
@@ -61,7 +68,7 @@ pub async fn create_discovery(i: u16) -> Arc<Discovery> {
    
     // Initializes our protocol (How Timofey and Eric do things).  Portal Config? 
     let discovery = Arc::new(Discovery::new_raw(discv5, Default::default())); 
-    println!("Discovery in use: {:?}", discovery);
+    // println!("Discovery in use: {:?}", discovery);
 
     /*
         Initialize discovery.start() instead of discv5.start().  It calls discv5.start() AND sets up the proxy to sit between different overlay protocols and our Discv5. 

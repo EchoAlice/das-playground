@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use discv5::ConnectionDirection;
 use discv5_overlay::{
     portalnet::types::content_key::OverlayContentKey,
     types::validation::Validator,
@@ -12,29 +13,11 @@ use ssz_derive::{Decode, Encode};
 
 
 
-// Content keys are used to request or offer specific content data through discv5.  Certain overlay networks allow
-// communication of certain types of content. 
+// Content keys are used to request or offer specific content data through discv5.  Certain overlay networks allow communication of certain types of content. 
 // Discv5 TalkReq/TalkResp uses these keys to know which overlay-specific req handling logic is needed
-
-// Why is DASContentKey's UnboundedSender generic over some type UtpListenerRequest?
-
-// Can I pass TContentKey into our implementations?  If this works, we'll be able to plug in TContentKey instead of doubling up logic here
-// and within our overlay.rs!
 
 // To Do:
 //      Consolidate logic
-
-//  I don't believe we need to define our generics... They're defined within function/type definitions~! 
-// pub enum TContentKey {
-//     DASContentKey,
-//     SecureDASContent,
-// }
-
-// pub enum TValidator {
-//     DASValidator,
-//     SecureDASValidator,
-// }
-
 
 /// This is a content key in the DAS overlay network.
 #[derive(Clone, Debug, Decode, Encode, PartialEq)]
@@ -84,6 +67,7 @@ impl OverlayContentKey for DASContentKey {
 
 pub struct DASValidator;
 
+// Implementing a trait on a type
 #[async_trait]
 impl Validator<DASContentKey> for DASValidator {
     async fn validate_content(
