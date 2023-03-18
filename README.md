@@ -1,34 +1,42 @@
 # Motivation
-Full-scale Danksharding requires a lot of small pieces of data (samples), and attestations to said data, to be communicated efficiently across Ethereum's Consensus Layer p2p network.  
+As per Ethereum's [rollup-centric roadmap](https://ethereum-magicians.org/t/a-rollup-centric-ethereum-roadmap/4698), full-scale Danksharding requires extra *blob* data to be [available](https://github.com/ethereum/research/wiki/A-note-on-data-availability-and-erasure-coding) for others to download.  Efficient verification of a blob's availability can be achieved through the process of [data availability sampling](https://hackmd.io/@vbuterin/sharding_proposal#ELI5-data-availability-sampling), allowing the network to come to consensus on this data's availability without increasing the computational resources required for a node.
 
-Some design questions around *how* this new information should be communicated is still up in the air and is known as the Data Availability Sampling Networking problem.  Danny wrote a [Request For Proposals](https://github.com/ethereum/requests-for-proposals/blob/master/open-rfps/das.md) post which provides background to learn more about the problem.
+Between this increase in information (from 90 KB to 128 MB per block!) and our new communication paradigm (data availability sampling), Ethereum's Consensus Layer P2P Network needs an upgrade.
+
+Designs around *how* Ethereum's Consensus Layer P2P Network network can communicate this new information is an open question known as the [Data Availability Sampling Networking problem](https://github.com/ethereum/requests-for-proposals/blob/master/open-rfps/das.md).
+
+
 
 # Summary
-Within DAS Playground I implement the basic p2p network construction behind one possible solution: a Secure Kademlia DHT discv5 overlay (validators only routing table).  See [Dankrad's Post](https://notes.ethereum.org/@dankrad/S-Kademlia-DAS) for details.
+One possible solution to the DAS Networking problem is to create a **Secure Kademlia DHT overlay network atop Discv5**.
 
-The idea behind this repository is to build out the DAS p2p networking stack needed to create a Secure K-DHT, then integrate the secure overlay protocol within a forked repo ([Model DAS](https://github.com/EchoAlice/Model-DAS)) of Timofey and Eric's DAS networking simulation, [DAS Prototype](https://github.com/ChainSafe/das-prototype).
+DAS Playground combines Dankrad's idea of a [Secure Kademlia DHT]((https://notes.ethereum.org/@dankrad/S-Kademlia-DAS)) with the main data struct found within Timofey and Eric's discv5 overlay simulation, a [DASNode](https://github.com/ChainSafe/das-prototype/blob/main/src/main.rs#L88) within [DAS Playground](https://github.com/ChainSafe/das-prototype), to create the networking stack nodes need for this p2p networking design.
 
-### Goals:
-1.  Spin up DASNodes that instantiate: 
-    - Discovery Protocol                       [X]
-    - Overlay Protocol                         [X]
-        1. Main DAS Overlay Subnetwork         [X]     
-        2. Secure DAS Overlay Subnetwork       [X]     
-2.  Manipulate node's state through our main and secure DAS networks  
-3.  Add peers to their routing tables and samples to data stores through overlay requests.
+**This repository was created to facilitate understanding of these overlay protocols to integrate this secure overlay network within a forked version of Timofey and Eric's simulation, [Model DAS](https://github.com/EchoAlice/Model-DAS).**
 
-### To Do:
-1. Instantiate message processing within each node.  (Like Tim or like Trin?)
+
+
+&nbsp;
+### **DASNode Protocol Structs:** 
+
+DAS Overlay  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SecureDAS Overlay
+&nbsp;&nbsp;&nbsp;Network     &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Network
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;\ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;\ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Discv5
+
+*** DAS Prototype and Model DAS leverage Trin's [overlay protocol](https://github.com/ethereum/trin/tree/master/trin-core/src/portalnet) + Sigma Prime's [discv5 protocol](https://github.com/sigp/discv5) to support these custom overlay networks. 
+
+
+&nbsp;
+---
+### Done
+1. Created DASNodes with protocol structs, services and message processing to instantiate all three networks
+2. Nodes can send and receive messages via overlay subnetworks
+
+
+### To Do
+1. Populate overlays' routing tables 
 2. Send all message types via overlay protocols
-3. Update Overlays' routing tables.  Send message requests through routing table entries.
-4. Introduce SecureDAS Overlay logic within [Model DAS](https://github.com/EchoAlice/Model-DAS)
-
-### Currently:
-I'm figuring out how to handle messages from multiple overlay networks.  Not sure whether I can process different overlays' messages within this single message processing task... Or if I have to set up a proxy, similar to [Trin](https://github.com/ethereum/trin/blob/master/trin-core/src/portalnet/discovery.rs#L173) to handle these seperate networks.
-
-Had to create a new overlay protocol struct within DASNode for **each** overlay network I'm wanting to create!  (This threw me off for a bit)
-
-### Note:
-I'm trying to design this repository to be easy to comprehend (at the cost of efficiency), making these networking concepts more accessible.
-
-If you've got suggestions for cleaner code or have any questions, make a PR or reach out!  
+3. Integrate SecureDAS Overlay within [Model DAS](https://github.com/EchoAlice/Model-DAS)
+4. Create fallback network logic
