@@ -134,7 +134,7 @@ pub async fn create_das_overlay(discovery: Arc<Discovery>, utp_listener_tx: mpsc
         query_peer_timeout: Duration::from_secs(30),
         ..Default::default()
     };
-    println!("Overlay config bootnodes: {:?}", config.bootnode_enrs);
+    // println!("Overlay config bootnodes: {:?}", config.bootnode_enrs);
     let storage = {
         Arc::new(parking_lot::RwLock::new(MemoryContentStore::new(
             discovery.discv5.local_enr().node_id(),
