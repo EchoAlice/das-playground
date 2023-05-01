@@ -20,14 +20,11 @@ use std::{
 };
 use tokio::sync::mpsc;
 
-use crate::das_node::{
-    content_key::{
-        DASContentKey,
-        DASValidator,
-        SecureDASContentKey, 
-        SecureDASValidator, 
-        // ValidatorType, 
-    } 
+use crate::content_key::{
+    DASContentKey,
+    DASValidator,
+    SecureDASContentKey, 
+    SecureDASValidator, 
 };
 
 const DAS_PROTOCOL_ID: &str = "DAS";

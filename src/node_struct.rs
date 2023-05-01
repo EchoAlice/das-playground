@@ -8,7 +8,7 @@ use discv5_overlay::{
 };
 use std::sync::Arc;
 
-use crate::das_node::content_key::{
+use crate::content_key::{
     DASContentKey, 
     DASValidator,
     SecureDASContentKey,

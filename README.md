@@ -33,5 +33,7 @@ DAS Playground combines Dankrad's idea of a [Secure Kademlia DHT]((https://notes
 1. Populate overlays' routing tables
 2. Remove outer main.rs file
 3. Send all message types via overlay protocols
-4. Integrate SecureDAS Overlay within [Model DAS](https://github.com/EchoAlice/Model-DAS)
-5. Create attacks and fallback network logic
+4. Remove Duplicate code:
+    - Overlay functions
+5. Integrate SecureDAS Overlay within [Model DAS](https://github.com/EchoAlice/Model-DAS)
+6. Create attacks and fallback network logic
