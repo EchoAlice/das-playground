@@ -5,6 +5,7 @@ use discv5::{
 };
 use discv5_overlay::{
     portalnet::{
+        discovery::Discovery,
         overlay_service::{
             OverlayCommand,
             OverlayService
@@ -69,28 +70,37 @@ async fn main() {
     //============================ 
     //   Part 1:  Node Creation
     //============================ 
+    let mut discv5_structs = Vec::new();
     let mut nodes = Vec::new();
 
-    // Create all Discv5 servers here.  Then pass these into create_nodes.
+    // Create all Discv5 servers, then pass these into create_nodes.
+    for i in 0.. NUMBER_OF_NODES {
+        let discv5_struct = discovery::create_discovery(i as u16).await;
+        discv5_structs.push(discv5_struct)
+    }
+
+    // Populate discv5 tables
+    for i in 0..NUMBER_OF_NODES {
+        populate_discv5_table(i, discv5_structs.clone());
+    }
 
     // Instantiates protocol structs and message processing within each node
-    for i in 0..NUMBER_OF_NODES {
+    for i in discv5_structs.into_iter() {
         let (
             starter_node, 
             mut overlay_service,
             mut secure_overlay_service, 
             utp_events_tx, 
             utp_listener_rx
-        ) = create_node(i as u16).await;
+        ) = create_node(i).await;
      
-        // I don't think we can obtain the event stream using discovery.start() instead of discv5.start() 
         let mut event_str = ReceiverStream::new(starter_node.discovery.discv5.event_stream().await.unwrap());
 
         // Copying the entire node to pass info into our task manager  :P 
         let node = starter_node.clone(); 
         nodes.push(starter_node);
         
-        // This is the server side of our nodes. Instantiates task manager to continually process ALL messages for each node.
+        // Instantiates task manager to continually process ALL messages for each node (server side of node).
         // Wrap message processing code into a function so it's easy to read.
         tokio::spawn(async move {
             loop {
@@ -171,10 +181,10 @@ async fn main() {
                     // ==========================
                     // Incoming event
                     Some(event) = event_str.next() => {
-                        let chan = format!("{i} {}", node.discovery.discv5.local_enr().node_id().to_string());
+                        // let chan = format!("{:?} {i}", node.discovery.discv5.local_enr().node_id().to_string());
                         match event {
                             Discv5Event::TalkRequest(req) => {
-                                println!("Stream {}: Discv5 TalkReq received", chan);  
+                                // println!("Stream {}: Discv5 TalkReq received", chan);  
                                 
                                 let node = node.clone(); 
                                 tokio::spawn(async move {
@@ -185,14 +195,16 @@ async fn main() {
                                         let talk_resp = match node.overlay.process_one_request(&req).await {
                                             Ok(response) => discv5_overlay::portalnet::types::messages::Message::from(response).into(),
                                             Err(err) => {
-                                                error!("Node {chan} Error processing request: {err}");
+                                                error!("Error processing request:");
+                                                // error!("Node {chan} Error processing request: {err}");
                                                 return;
                                             },
                                         };
 
                                         if let Err(err) = req.respond(talk_resp) {
                                             println!("Error");  
-                                            error!("Unable to respond to talk request: {}", err);
+                                            error!("Unable to respond to talk request: ");
+                                            // error!("Unable to respond to talk request: {}", err);
                                             return;
                                         }
 
@@ -206,14 +218,16 @@ async fn main() {
                                         // let talk_resp = match node.secure_overlay.process_one_request(&req).await {
                                             Ok(response) => discv5_overlay::portalnet::types::messages::Message::from(response).into(),
                                             Err(err) => {
-                                                error!("Node {chan} Error processing request: {err}");
+                                                error!("Node Error processing request: ");
+                                                // error!("Node {chan} Error processing request: {err}");
                                                 return;
                                             },
                                         };
 
                                         if let Err(err) = req.respond(talk_resp) {
                                             println!("Error");  
-                                            error!("Unable to respond to talk request: {}", err);
+                                            error!("Unable to respond to talk request: ");
+                                            // error!("Unable to respond to talk request: {}", err);
                                             return;
                                         }
 
@@ -232,27 +246,14 @@ async fn main() {
         });
     }
 
-    // **Problem:**  Our discv5 routing tables are being populated *after* overlays are created.  
-    //               A node's overlay table relies on bootstrapping from ENRs found within its discv5 table.
-    for i in 0..NUMBER_OF_NODES {
-        // Populate overlay networks 
-        populate_routing_table(i, nodes.clone());
-    }
-
-    // View of Routing Table
+    // View of a node's routing table
     // ----------------------------
-    // Discv5 
-    println!("Local node's discv5 routing table *CONNECTED PEERS*: {:?}", nodes[2].discovery.connected_peers()); 
+    println!("Node's discv5 routing table: {:?}", nodes[2].discovery.connected_peers()); 
     println!("\n");
-    println!("Local node's discv5 routing table *TABLE ENTRIES*: {:?}", nodes[2].discovery.discv5.table_entries_enr()); 
+    println!("Node's overlay routing table: {:?}", nodes[2].overlay.table_entries_id()); 
     println!("\n");
-    // DAS Overlay 
-    println!("Local node's overlay routing table: {:?}", nodes[2].overlay.table_entries_id()); 
-    // SecureDAS Overlay 
-    println!("Local node's secure overlay routing table: {:?}", nodes[2].secure_overlay.table_entries_id()); 
+    println!("Node's secure overlay routing table: {:?}", nodes[2].secure_overlay.table_entries_id()); 
     println!("\n");
-
-
 
 
     /* 
@@ -269,15 +270,15 @@ async fn main() {
     // ------------------ 
     let das_ping = nodes[1].overlay.send_ping(nodes[2].overlay.local_enr());
     das_ping.await;
-    // TODO: Send find nodes 
-    // TODO: Send find content 
+    // TODO: Send find_nodes 
+    // TODO: Send find_content 
 
     // Secure Overlay Messaging
     // -------------------------- 
     let secure_das_ping = nodes[1].secure_overlay.send_ping(nodes[2].secure_overlay.local_enr());
     secure_das_ping.await;
-    // TODO: Send find nodes 
-    // TODO: Send find content 
+    // TODO: Send find_nodes 
+    // TODO: Send find_content 
 
     //================================ 
     //         Sanity Check 
@@ -288,49 +289,38 @@ async fn main() {
 }
 
 
-async fn create_node(i: u16) -> (
+async fn create_node(discv5_struct: Arc<Discovery>) -> (
         DASNode, 
         OverlayService<DASContentKey, XorMetric, DASValidator, MemoryContentStore>,
         OverlayService<SecureDASContentKey, XorMetric, SecureDASValidator, MemoryContentStore>,
         UnboundedSender<TalkRequest>,
         UnboundedReceiver<UtpListenerEvent>
     ) {
-    // 1. Discovery Protocol 
-    //------------------------
-    let discovery = discovery::create_discovery(i).await;
-    // println!("Config bootnodes *MAIN*: {:?}", discovery.discv5.table_entries_enr());
 
     // DAS Overlay UTP Channel 
     let ( utp_events_tx, 
             utp_listener_tx, mut utp_listener_rx, 
             mut utp_listener,
-    ) = UtpListener::new(discovery.clone());
+    ) = UtpListener::new(discv5_struct.clone());
     tokio::spawn(async move { utp_listener.start().await });
     
     // Secure DAS Overlay UTP Channel 
     let ( secure_utp_events_tx, 
             secure_utp_listener_tx, mut secure_utp_listener_rx, 
             mut secure_utp_listener,
-    ) = UtpListener::new(discovery.clone());
+    ) = UtpListener::new(discv5_struct.clone());
     tokio::spawn(async move { secure_utp_listener.start().await });
 
-   
-    //--------------------
-    // INTERMEDIATE PHASE 
-    //--------------------
-    // 2. DAS Overlay Protocol  
-    let (overlay, overlay_service) = overlay::create_das_overlay(discovery.clone(), utp_listener_tx).await;  
-    // 3. Secure DAS Overlay Protocol   
-    let (secure_overlay, secure_overlay_service) = overlay::create_secure_das_overlay(discovery.clone(), secure_utp_listener_tx).await;  
+    // DAS and Secure DAS Overlay Protocols
+    let (overlay, overlay_service) = overlay::create_das_overlay(discv5_struct.clone(), utp_listener_tx).await;
+    let (secure_overlay, secure_overlay_service) = overlay::create_secure_das_overlay(discv5_struct.clone(), secure_utp_listener_tx).await;  
 
-    //-----------------------------
-    // GENERALIZE OVERLAY CREATION
-    //-----------------------------
     //  Samples: TODO
+    
     //  Handled_ids: TODO 
 
     // Creates node (Timofey creates node with utp_listener_tx) 
-    let mut my_node = DASNode::new(discovery, overlay, secure_overlay);
+    let mut my_node = DASNode::new(discv5_struct, overlay, secure_overlay);
     
     (
         my_node,
@@ -343,7 +333,7 @@ async fn create_node(i: u16) -> (
 
 
 // Adds nodes from within the simulation to routing tables.  
-fn populate_routing_table(local_index: usize, mut nodes: Vec<DASNode>) {
+fn populate_discv5_table(local_index: usize, mut structs: Vec<Arc<Discovery>>) {
     // Number of peers a node adds to their routing table 
     let mut n = 3;
     let mut used_indexes = Vec::new();
@@ -360,13 +350,8 @@ fn populate_routing_table(local_index: usize, mut nodes: Vec<DASNode>) {
             }
         }
         
-        // ***How can I populate all routing tables with the same 3 nodes?***
         if invalid_index == false {
-            // nodes[local_index].discovery.discv5.add_enr(nodes[rand].discovery.discv5.local_enr().clone());
-            // nodes[local_index].overlay.bucket_entries(somehow add ENRs to this routing table);
-            // nodes[local_index].secure_overlay.bucket_entries(somehow add ENRs to this routing table);
-            
-            match nodes[local_index].discovery.discv5.add_enr(nodes[rand].discovery.discv5.local_enr().clone()) {
+            match structs[local_index].discv5.add_enr(structs[rand].discv5.local_enr().clone()) {
                 Ok(_) => {
                     used_indexes.push(rand);
                     n -= 1;
