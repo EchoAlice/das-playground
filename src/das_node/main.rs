@@ -48,21 +48,19 @@ const DAS_PROTOCOL_ID: &str = "DAS";
 const SECURE_DAS_PROTOCOL_ID: &str = "SECURE_DAS";
 
 
-
 /*
     Goals 
         - Create DASNodes that contain the protocols and subprotocols needed for a backup, 
           validator-only DHT, discv5 overlay network so participates in the repo can communicate.  
 
-
     Questions:
         - Are data shard validator committees the same committees used within Light Client things?  
         - Should I create a proxy for message processing to handle my two seperate overlays?
-                See Trin: https://github.com/ethereum/trin/blob/master/trin-core/src/portalnet/discovery.rs#L174 
 
 
     Notes:
         - Discv5 IP addresses might be wrong
+        - Trin uses a proxy for message processing:  https://github.com/ethereum/trin/blob/master/trin-core/src/portalnet/discovery.rs#L174 
 */
 
 
@@ -72,7 +70,9 @@ async fn main() {
     //   Part 1:  Node Creation
     //============================ 
     let mut nodes = Vec::new();
-    
+
+    // Create all Discv5 servers here.  Then pass these into create_nodes.
+
     // Instantiates protocol structs and message processing within each node
     for i in 0..NUMBER_OF_NODES {
         let (
@@ -82,23 +82,16 @@ async fn main() {
             utp_events_tx, 
             utp_listener_rx
         ) = create_node(i as u16).await;
-      
+     
         // I don't think we can obtain the event stream using discovery.start() instead of discv5.start() 
         let mut event_str = ReceiverStream::new(starter_node.discovery.discv5.event_stream().await.unwrap());
 
-        // It doesn't feel clean copying the entire node to pass info into our task manager  :P 
+        // Copying the entire node to pass info into our task manager  :P 
         let node = starter_node.clone(); 
         nodes.push(starter_node);
-
-        /* 
-        Big Question:
-            How should I handle messages from different subnetworks? 
-                - One big event loop or proxy?
-                           
-            See Trin for Proxy: https://github.com/ethereum/trin/blob/master/trin-core/src/portalnet/discovery.rs#L174
-        */
         
         // This is the server side of our nodes. Instantiates task manager to continually process ALL messages for each node.
+        // Wrap message processing code into a function so it's easy to read.
         tokio::spawn(async move {
             loop {
                 /// "Select!" randomly picks one of these match branches to process an event 
@@ -238,21 +231,25 @@ async fn main() {
             } 
         });
     }
-    
-    // Populates our nodes' routing tables.  
+
+    // **Problem:**  Our discv5 routing tables are being populated *after* overlays are created.  
+    //               A node's overlay table relies on bootstrapping from ENRs found within its discv5 table.
     for i in 0..NUMBER_OF_NODES {
-        // ***Figure out how to populate our overlay networks***
+        // Populate overlay networks 
         populate_routing_table(i, nodes.clone());
     }
 
-    // View of Routing Tables
+    // View of Routing Table
     // ----------------------------
     // Discv5 
-    println!("Nodes connected to local node's discv5 routing table: {:?}", nodes[2].discovery.connected_peers()); 
+    println!("Local node's discv5 routing table *CONNECTED PEERS*: {:?}", nodes[2].discovery.connected_peers()); 
+    println!("\n");
+    println!("Local node's discv5 routing table *TABLE ENTRIES*: {:?}", nodes[2].discovery.discv5.table_entries_enr()); 
+    println!("\n");
     // DAS Overlay 
-    println!("Nodes connected to local node's overlay routing table: {:?}", nodes[2].overlay.table_entries_id()); 
+    println!("Local node's overlay routing table: {:?}", nodes[2].overlay.table_entries_id()); 
     // SecureDAS Overlay 
-    println!("Nodes connected to local node's secure overlay routing table: {:?}", nodes[2].secure_overlay.table_entries_id()); 
+    println!("Local node's secure overlay routing table: {:?}", nodes[2].secure_overlay.table_entries_id()); 
     println!("\n");
 
 
@@ -291,8 +288,6 @@ async fn main() {
 }
 
 
-
-
 async fn create_node(i: u16) -> (
         DASNode, 
         OverlayService<DASContentKey, XorMetric, DASValidator, MemoryContentStore>,
@@ -303,10 +298,8 @@ async fn create_node(i: u16) -> (
     // 1. Discovery Protocol 
     //------------------------
     let discovery = discovery::create_discovery(i).await;
+    // println!("Config bootnodes *MAIN*: {:?}", discovery.discv5.table_entries_enr());
 
-
-    // UTP Channels (Ignore)
-    // -----------------------
     // DAS Overlay UTP Channel 
     let ( utp_events_tx, 
             utp_listener_tx, mut utp_listener_rx, 
@@ -325,30 +318,16 @@ async fn create_node(i: u16) -> (
     //--------------------
     // INTERMEDIATE PHASE 
     //--------------------
-    // 2. DAS Overlay Protocol   
+    // 2. DAS Overlay Protocol  
     let (overlay, overlay_service) = overlay::create_das_overlay(discovery.clone(), utp_listener_tx).await;  
     // 3. Secure DAS Overlay Protocol   
     let (secure_overlay, secure_overlay_service) = overlay::create_secure_das_overlay(discovery.clone(), secure_utp_listener_tx).await;  
 
-/*
     //-----------------------------
     // GENERALIZE OVERLAY CREATION
     //-----------------------------
-    // 2. DAS Overlay Protocol   
-    let das_protocol = ProtocolId::Custom(DAS_PROTOCOL_ID.to_string());
-    let das_validator = Arc::new(DASValidator);
-    let (overlay, overlay_service) = overlay::create_overlay(discovery.clone(), das_protocol, das_validator, utp_listener_tx).await;  
-    
-    // 3. Secure Overlay Protocol
-    let secure_protocol = ProtocolId::Custom(SECURE_DAS_PROTOCOL_ID.to_string());
-    let secure_das_validator = Arc::new(SecureDASValidator);
-    let (overlay, overlay_service) = overlay::create_overlay(discovery.clone(), secure_protocol, secure_das_validator, utp_listener_tx).await;  
-*/
-
     //  Samples: TODO
-    
     //  Handled_ids: TODO 
-
 
     // Creates node (Timofey creates node with utp_listener_tx) 
     let mut my_node = DASNode::new(discovery, overlay, secure_overlay);
@@ -380,28 +359,18 @@ fn populate_routing_table(local_index: usize, mut nodes: Vec<DASNode>) {
                 invalid_index = true; 
             }
         }
-        // ==================================================================
-        // ==================================================================
-        // ***How can I populate all routing tables with the same 3 nodes?***
-        // ==================================================================
-        // ==================================================================
-        // Not hanlding errors right now.  Getting concept down   :P 
         
+        // ***How can I populate all routing tables with the same 3 nodes?***
         if invalid_index == false {
-            nodes[local_index].discovery.discv5.add_enr(nodes[rand].discovery.discv5.local_enr().clone());
+            // nodes[local_index].discovery.discv5.add_enr(nodes[rand].discovery.discv5.local_enr().clone());
             // nodes[local_index].overlay.bucket_entries(somehow add ENRs to this routing table);
             // nodes[local_index].secure_overlay.bucket_entries(somehow add ENRs to this routing table);
             
-            
-            
-            
-            // Figure out control flow later.  This is original code!
             match nodes[local_index].discovery.discv5.add_enr(nodes[rand].discovery.discv5.local_enr().clone()) {
                 Ok(_) => {
                     used_indexes.push(rand);
                     n -= 1;
                 },
-                // Might need to change this 
                 Err(_) => continue,
             }
         }

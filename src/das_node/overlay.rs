@@ -42,76 +42,10 @@ const SECURE_DAS_PROTOCOL_ID: &str = "SECURE_DAS";
     -Trin repo
 
 
-Note:
-    - Currently modifying parameters and return values of the function with generics!
-    - The Validator type what tells our OverlayProtocol::new( ) the type of overlay we're creating!
+    Note:
+    - The Validator type what tells our OverlayProtocol::new( ) the type of overlay we're creating
+    - To do: generalize create_overlay function
 */
-
-
-
-
-/*
-//-----------------------------
-// GENERALIZE OVERLAY CREATION
-//-----------------------------
-//
-// Passes in an enum as our validator type
-// pub async fn create_overlay<TContentKey, TValidator>(discovery: Arc<Discovery>, protocol: ProtocolId, validator:Arc<ValidatorType>, utp_listener_tx: mpsc::UnboundedSender<UtpListenerRequest>) -> ( 
-
-// This function definition feels right
-pub async fn create_overlay<TContentKey, TValidator>(discovery: Arc<Discovery>, protocol: ProtocolId, validator:Arc<TValidator>, utp_listener_tx: mpsc::UnboundedSender<UtpListenerRequest>) -> ( 
-    Arc<OverlayProtocol<TContentKey, XorMetric, TValidator, MemoryContentStore>>, 
-    OverlayService<TContentKey, XorMetric, TValidator, MemoryContentStore>,
-    ) { 
-        let config = OverlayConfig {
-        bootnode_enrs: discovery.clone().discv5.table_entries_enr(),
-        ping_queue_interval: Some(Duration::from_secs(10000)),
-        query_num_results: usize::MAX,
-        query_timeout: Duration::from_secs(60),
-        query_peer_timeout: Duration::from_secs(30),
-        ..Default::default()
-    };
-
-    let storage = {
-        Arc::new(parking_lot::RwLock::new(MemoryContentStore::new(
-            discovery.discv5.local_enr().node_id(),
-            DistanceFunction::Xor,
-        )))
-    };
-    
-    // Use this IF we decide to return an enum and can't figure out how to add the validtaor<> trait to our generic trait    
-    // match protocol {
-    //     ProtocolId::Custom(DAS_PROTOCOL_ID.to_string()) => {
-    //     },
-    //     ProtocolId::Custom(SECURE_DAS_PROTOCOL_ID.to_string()) => {
-    //     },
-    //     _ => {} 
-    // }
-  
-    // This shouldn't be here.  Testing what happens when "TValidator<>" trait bound errors aren't happening
-    let protocol = ProtocolId::Custom(DAS_PROTOCOL_ID.to_string());
-    let validator = Arc::new(DASValidator);
-
-    let (overlay, service) = OverlayProtocol::new(
-        config,
-        discovery.clone(),
-        utp_listener_tx,
-        storage,
-        Distance::MAX,
-        protocol,
-        validator,
-    );
-   
-    let overlay = Arc::new(overlay);
-    ( 
-        overlay, 
-        service 
-    )
-}
-*/
-
-
-
 
 
 // -----------------------------------
@@ -127,14 +61,14 @@ pub async fn create_das_overlay(discovery: Arc<Discovery>, utp_listener_tx: mpsc
     OverlayService<DASContentKey, XorMetric, DASValidator, MemoryContentStore>,
 ){
     let config = OverlayConfig {
-        bootnode_enrs: discovery.clone().discv5.table_entries_enr(),
+        bootnode_enrs: discovery.discv5.table_entries_enr(),
         ping_queue_interval: Some(Duration::from_secs(10000)),
         query_num_results: usize::MAX,
         query_timeout: Duration::from_secs(60),
         query_peer_timeout: Duration::from_secs(30),
         ..Default::default()
     };
-    // println!("Overlay config bootnodes: {:?}", config.bootnode_enrs);
+    // println!("Overlay config bootnodes *OVERLAY*: {:?}", config.bootnode_enrs);
     let storage = {
         Arc::new(parking_lot::RwLock::new(MemoryContentStore::new(
             discovery.discv5.local_enr().node_id(),
@@ -154,7 +88,9 @@ pub async fn create_das_overlay(discovery: Arc<Discovery>, utp_listener_tx: mpsc
         protocol,
         validator,
     );
-   
+
+    // println!("Node's overlay kbuckets table: {:?}", overlay); 
+
     let overlay = Arc::new(overlay);
     ( 
         overlay, 
@@ -169,7 +105,7 @@ pub async fn create_secure_das_overlay(discovery: Arc<Discovery>, utp_listener_t
 ){
 
         let config = OverlayConfig {
-        bootnode_enrs: discovery.clone().discv5.table_entries_enr(),
+        bootnode_enrs: discovery.discv5.table_entries_enr(),
         ping_queue_interval: Some(Duration::from_secs(10000)),
         query_num_results: usize::MAX,
         query_timeout: Duration::from_secs(60),
